@@ -1,6 +1,8 @@
 package arena
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -30,5 +32,15 @@ func TestValidateScriptRejectsMissingEntrypoint(t *testing.T) {
 	err := ValidateScript(`def other(state): return 0`)
 	if err == nil || !strings.Contains(err.Error(), "choose_move") {
 		t.Fatalf("error = %v, want missing choose_move", err)
+	}
+}
+
+func TestApexSearchExampleValidates(t *testing.T) {
+	source, err := os.ReadFile(filepath.Join("..", "..", "examples", "apex-search.star"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateScript(string(source)); err != nil {
+		t.Fatalf("validate Apex Search: %v", err)
 	}
 }

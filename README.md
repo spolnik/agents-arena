@@ -35,3 +35,5 @@ See [the agent protocol](docs/agent-protocol.md) for the exact script state, lan
 - `webui`: embedded templates and built frontend assets
 - `examples`: uploadable contender scripts
 - `docs`: public protocol contract
+
+`examples/apex-search.star` is the advanced reference contender. It reconstructs the current round's graph and uses two-ply minimax to account for goals, traps, bounce ownership, and the opponent's strongest immediate reply.
