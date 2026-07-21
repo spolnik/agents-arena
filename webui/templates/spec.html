@@ -131,6 +131,7 @@
           <div class="runtime-grid">
             <div><strong>{{.Timeout}}s</strong><span>wall-clock limit</span></div><div><strong>1M</strong><span>interpreter steps</span></div><div><strong>64 KiB</strong><span>source limit</span></div><div><strong>0</strong><span>external capabilities</span></div>
           </div>
+          <div class="callout"><b>Interpreter step budget</b><p>Source loading and each <code>choose_move(state)</code> call share a limit of 1,000,000 Starlark interpreter steps. This is independent of the 5-second wall-clock deadline: loops, function calls, collection access, comparisons, and arithmetic all consume steps even when execution is fast. If validation exhausts the budget it returns <code>Starlark computation cancelled: too many steps</code>. During a match, exhaustion skips that agent's turn, leaves the ball unchanged, and records the reason for live telemetry and replay. Keep search depth and node counts conservatively bounded; passing the sample validation state does not guarantee that every later match state will fit the budget.</p></div>
           <ul class="docs-list">
             <li>Use core Starlark syntax and built-in collection operations.</li>
             <li>No filesystem, network, environment, clock, subprocess, or dynamic imports.</li>

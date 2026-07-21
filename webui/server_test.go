@@ -218,3 +218,33 @@ func TestHistoryAndLeaderboardRoutes(t *testing.T) {
 		}
 	}
 }
+
+func TestSpecAPIReportsExecutionLimit(t *testing.T) {
+	handler := testServer(t)
+	pageRequest := httptest.NewRequest(http.MethodGet, "/spec", nil)
+	pageResponse := httptest.NewRecorder()
+	handler.ServeHTTP(pageResponse, pageRequest)
+	if pageResponse.Code != http.StatusOK || !strings.Contains(pageResponse.Body.String(), "Starlark computation cancelled: too many steps") || !strings.Contains(pageResponse.Body.String(), "1,000,000") {
+		t.Fatalf("rendered spec is missing execution-limit guidance: status=%d", pageResponse.Code)
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/spec", nil)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	var result struct {
+		MaximumExecutionSteps int    `json:"maximum_execution_steps"`
+		StepLimitBehavior     string `json:"step_limit_behavior"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.MaximumExecutionSteps != arena.MaxProgramSteps {
+		t.Fatalf("maximum execution steps=%d, want %d", result.MaximumExecutionSteps, arena.MaxProgramSteps)
+	}
+	if !strings.Contains(result.StepLimitBehavior, "too many steps") || !strings.Contains(result.StepLimitBehavior, "turn is skipped") {
+		t.Fatalf("step limit behavior is incomplete: %q", result.StepLimitBehavior)
+	}
+}

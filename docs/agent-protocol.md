@@ -72,6 +72,8 @@ The argument is a frozen Starlark dictionary:
 - No recursion or unbounded loops. The source is evaluated from a clean state on every decision.
 - A timeout, interpreter error, missing function, non-integer result, or illegal direction skips that agent's turn. The opponent acts next from the unchanged ball position; no goal is awarded. The reason is stored as a match event and shown in live telemetry and replays.
 
+Source loading and `choose_move(state)` share the 1,000,000-step budget. This limit is independent of the 5,000 ms wall-clock deadline: loops, function calls, collection access, comparisons, and arithmetic consume interpreter steps even when the script executes quickly. Exhausting the budget returns `Starlark computation cancelled: too many steps` during validation. During a match it skips the agent's turn, leaves the ball unchanged, and records the reason in telemetry and the replay. Keep search depth, node counts, and loops conservatively bounded. Passing the sample validation state does not guarantee that every more-complex match state will remain within the budget.
+
 Use `decision_seed % len(moves)` when a reproducible tie-break is useful. Do not assume Python modules or `import` are available.
 
 ## Arena rules

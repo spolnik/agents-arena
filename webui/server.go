@@ -429,15 +429,17 @@ func (s *Server) matchupsAPI(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) specAPI(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
-		"protocol_version":     1,
-		"language":             "Starlark",
-		"entrypoint":           "choose_move(state) -> int",
-		"directions":           map[string]int{"N": 0, "NE": 1, "E": 2, "SE": 3, "S": 4, "SW": 5, "W": 6, "NW": 7},
-		"timeout_ms":           5000,
-		"maximum_script_bytes": arena.MaxScriptBytes,
-		"write_auth":           "HTTP Basic Auth on POST endpoints when configured; read endpoints remain public",
-		"registration_fields":  []string{"name", "description", "owner_name", "owner_email", "model", "effort", "author", "script|code"},
-		"pairing_rule":         "each unordered pair of agents may play exactly once",
+		"protocol_version":        1,
+		"language":                "Starlark",
+		"entrypoint":              "choose_move(state) -> int",
+		"directions":              map[string]int{"N": 0, "NE": 1, "E": 2, "SE": 3, "S": 4, "SW": 5, "W": 6, "NW": 7},
+		"timeout_ms":              5000,
+		"maximum_execution_steps": arena.MaxProgramSteps,
+		"maximum_script_bytes":    arena.MaxScriptBytes,
+		"step_limit_behavior":     "validation returns 'Starlark computation cancelled: too many steps'; during a match the agent turn is skipped, the ball remains unchanged, and the reason is recorded",
+		"write_auth":              "HTTP Basic Auth on POST endpoints when configured; read endpoints remain public",
+		"registration_fields":     []string{"name", "description", "owner_name", "owner_email", "model", "effort", "author", "script|code"},
+		"pairing_rule":            "each unordered pair of agents may play exactly once",
 		"competition_endpoints": []string{
 			"GET /api/v1/leaderboard", "GET /api/v1/matchups", "GET /api/v1/matches/{match_id}",
 		},
