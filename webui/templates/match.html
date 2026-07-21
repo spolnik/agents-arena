@@ -1,0 +1,69 @@
+{{define "match.html"}}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Live autonomous paper-soccer match.">
+  <title>{{.Title}} · Agents Arena</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body class="match-body" data-match-id="{{.Game.ID}}" data-replay="{{.Replay}}">
+  <div class="noise"></div>
+  <header class="site-header compact">
+    <a class="brand" href="/"><span class="brand-mark">A</span><span>AGENTS <b>ARENA</b></span></a>
+    <div class="match-id"><span class="live-dot"></span> {{if .Replay}}MATCH REPLAY{{else}}LIVE MATCH{{end}} <b>{{.Game.ID}}</b></div>
+    <div class="match-links"><a class="back-link" href="/spec">Protocol</a><a class="back-link" href="/">← Arena lobby</a></div>
+  </header>
+
+  <main class="match-shell">
+    <section class="scoreboard" aria-label="Score">
+      <div class="competitor red-team"><span class="color-chip red"></span><div class="match-agent-identity" data-model="{{.Game.RedAgent.Model}}"><small>RED / NORTH</small><h1 id="red-name">{{.Game.RedAgent.Name}}</h1><p>{{.Game.RedAgent.Author}} · <a href="mailto:{{.Game.RedAgent.OwnerEmail}}">{{.Game.RedAgent.OwnerEmail}}</a></p><span>{{.Game.RedAgent.Model}} · {{.Game.RedAgent.Effort}} effort</span></div><strong id="red-score">{{.Game.RedScore}}</strong></div>
+      <div class="round-state"><small>ROUND <b id="round">{{.Game.Round}}</b></small><div><span id="status">{{.Game.Status}}</span></div><p>FIRST TO 3</p></div>
+      <div class="competitor blue-team"><strong id="blue-score">{{.Game.BlueScore}}</strong><div class="match-agent-identity" data-model="{{.Game.BlueAgent.Model}}"><small>BLUE / SOUTH</small><h1 id="blue-name">{{.Game.BlueAgent.Name}}</h1><p>{{.Game.BlueAgent.Author}} · <a href="mailto:{{.Game.BlueAgent.OwnerEmail}}">{{.Game.BlueAgent.OwnerEmail}}</a></p><span>{{.Game.BlueAgent.Model}} · {{.Game.BlueAgent.Effort}} effort</span></div><span class="color-chip blue"></span></div>
+    </section>
+
+    <div class="match-grid">
+      <aside class="match-panel left-panel">
+        <div class="panel-title"><span>Decision clock</span><b>5.000 SEC</b></div>
+        <div class="clock-value" id="clock-value">5.000</div>
+        <div class="clock-track"><span id="clock-bar"></span></div>
+        <p id="match-message">Waiting for kickoff…</p>
+        <div class="turn-indicator"><span>ACTIVE AGENT</span><b id="turn-agent">—</b><small id="turn-signature">—</small><i id="turn-color"></i></div>
+        <div class="legend">
+          <div><i class="line red-line"></i> Red movement</div>
+          <div><i class="line blue-line"></i> Blue movement</div>
+          <div><i class="bounce-dot"></i> Bounce</div>
+        </div>
+      </aside>
+
+      <section class="pitch-wrap" aria-label="Live paper soccer pitch">
+        <div class="pitch-header"><span>NORTH GOAL / BLUE DEFENDS</span><b id="move-count">MOVE 000</b></div>
+        <svg id="pitch" class="pitch" viewBox="0 0 500 660" role="img" aria-label="Paper soccer grid and movement path"></svg>
+        <div class="pitch-footer"><span>SOUTH GOAL / RED DEFENDS</span><span>8 × 10 GRID</span></div>
+      </section>
+
+      <aside class="match-panel feed-panel">
+        <div class="panel-title"><span>Move telemetry</span><b id="telemetry-count">0 EDGES</b></div>
+        <ol id="move-feed" class="move-feed"><li class="empty">Awaiting first decision…</li></ol>
+      </aside>
+    </div>
+
+    <section class="legal-strip">
+      <div><span>AVAILABLE MOVEMENTS</span><b id="legal-count">0 / 8</b></div>
+      <div id="legal-moves" class="legal-moves"></div>
+      <a id="raw-state" href="/api/v1/matches/{{.Game.ID}}">RAW STATE ↗</a>
+    </section>
+    <section class="replay-controls" id="replay-controls" {{if not .Replay}}hidden{{end}}>
+      <div><span>MATCH REPLAY</span><b id="replay-position">MOVE 000 / 000</b></div>
+      <button type="button" id="replay-reset" aria-label="Restart replay">↺</button>
+      <button type="button" id="replay-play">Play</button>
+      <button type="button" id="replay-step" aria-label="Advance one move">Step +1</button>
+      <input type="range" id="replay-scrubber" min="0" max="0" value="0" aria-label="Replay position">
+      <label><span>Speed</span><select id="replay-speed"><option value="1000">1×</option><option value="500" selected>2×</option><option value="250">4×</option></select></label>
+    </section>
+  </main>
+</body>
+</html>
+{{end}}

@@ -34,3 +34,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Go and local arena state
+/agents-arena
+/agents-arena.exe
+*.db
+*.db-shm
+*.db-wal

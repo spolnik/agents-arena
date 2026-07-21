@@ -1,0 +1,221 @@
+{{define "spec.html"}}
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Agents Arena Protocol v1: Starlark agent contract, paper-soccer rules, and HTTP API.">
+  <title>{{.Title}} · Agents Arena</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/docs.js" defer></script>
+</head>
+<body class="spec-body">
+  <div class="noise"></div>
+  <header class="site-header compact">
+    <a class="brand" href="/"><span class="brand-mark">A</span><span>AGENTS <b>ARENA</b></span></a>
+    <nav aria-label="Specification navigation">
+      <a href="#contract">Contract</a><a href="#state">State</a><a href="#rules">Rules</a><a href="#api">API</a>
+      <a class="nav-cta" href="/">Arena lobby</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="spec-hero">
+      <div>
+        <div class="eyebrow"><span class="live-dot"></span> public competition contract</div>
+        <h1>Agent Protocol <em>v1</em></h1>
+        <p>Everything a human or coding agent needs to build, register, and run a contender in Agents Arena.</p>
+      </div>
+      <div class="spec-version-card">
+        <span>PROTOCOL STATUS</span><strong>STABLE / V1</strong>
+        <dl><div><dt>Language</dt><dd>Starlark</dd></div><div><dt>Entrypoint</dt><dd>choose_move</dd></div><div><dt>Deadline</dt><dd>{{.Timeout}} seconds</dd></div><div><dt>Return</dt><dd>integer 0–7</dd></div></dl>
+      </div>
+    </section>
+
+    <div class="spec-layout">
+      <aside class="spec-toc" aria-label="On this page">
+        <span>ON THIS PAGE</span>
+        <a href="#quick-start">00 · Quick start</a>
+        <a href="#contract">01 · Script contract</a>
+        <a href="#directions">02 · Directions</a>
+        <a href="#state">03 · State object</a>
+        <a href="#runtime">04 · Runtime limits</a>
+        <a href="#rules">05 · Arena rules</a>
+        <a href="#api">06 · HTTP API</a>
+        <a href="#faults">07 · Faults</a>
+        <a href="#agent-prompt">08 · AI prompt</a>
+        <a class="toc-json" href="/api/v1/spec">JSON summary ↗</a>
+      </aside>
+
+      <article class="spec-content">
+        <section class="spec-section" id="quick-start">
+          <div class="spec-kicker">00 / QUICK START</div>
+          <h2>One file. One function.<br>One legal direction.</h2>
+          <p class="spec-lead">Upload a UTF-8 <code>.star</code> file defining <code>choose_move(state)</code>. The arena supplies the complete observable match state and all legal movements. Your function returns the direction number for exactly one edge.</p>
+          <div class="docs-code">
+            <div class="docs-code-head"><span>agent.star</span><button type="button" data-copy-target="quick-code">Copy code</button></div>
+            <pre id="quick-code"><code>{{.Script}}</code></pre>
+          </div>
+          <div class="callout"><b>Important</b><p>Return one edge, not an entire path. When a move bounces, the arena calls your function again with fresh state and a new {{.Timeout}}-second budget.</p></div>
+        </section>
+
+        <section class="spec-section" id="contract">
+          <div class="spec-kicker">01 / SCRIPT CONTRACT</div>
+          <h2>The complete interface</h2>
+          <div class="contract-grid">
+            <div><span>FILE</span><strong>agent.star</strong><p>One UTF-8 Starlark source file, up to {{.MaxBytes}} bytes.</p></div>
+            <div><span>FUNCTION</span><strong>choose_move(state)</strong><p>May call helpers defined in the same file.</p></div>
+            <div><span>INPUT</span><strong>frozen dictionary</strong><p>Read-only board, score, path, identity, and legal moves.</p></div>
+            <div><span>OUTPUT</span><strong>integer 0–7</strong><p>Must match a direction in <code>legal_moves</code>.</p></div>
+          </div>
+          <p>No initialization or lifecycle hook is required. Source is evaluated from a clean state for every decision, so an agent must derive its decision entirely from the supplied state.</p>
+        </section>
+
+        <section class="spec-section" id="directions">
+          <div class="spec-kicker">02 / DIRECTION NOTATION</div>
+          <h2>Eight possible edges</h2>
+          <p>Coordinates start at the north-west pitch corner. Increasing <code>x</code> moves east; increasing <code>y</code> moves south.</p>
+          <div class="direction-grid" aria-label="Direction numbers">
+            <div><b>7</b><strong>↖</strong><span>NW</span><small>−1, −1</small></div><div><b>0</b><strong>↑</strong><span>N</span><small>0, −1</small></div><div><b>1</b><strong>↗</strong><span>NE</span><small>+1, −1</small></div>
+            <div><b>6</b><strong>←</strong><span>W</span><small>−1, 0</small></div><div class="direction-center"><strong>●</strong><span>BALL</span></div><div><b>2</b><strong>→</strong><span>E</span><small>+1, 0</small></div>
+            <div><b>5</b><strong>↙</strong><span>SW</span><small>−1, +1</small></div><div><b>4</b><strong>↓</strong><span>S</span><small>0, +1</small></div><div><b>3</b><strong>↘</strong><span>SE</span><small>+1, +1</small></div>
+          </div>
+        </section>
+
+        <section class="spec-section" id="state">
+          <div class="spec-kicker">03 / STATE OBJECT</div>
+          <h2>Everything the agent can see</h2>
+          <div class="docs-code">
+            <div class="docs-code-head"><span>Example Starlark value</span><button type="button" data-copy-target="state-code">Copy state</button></div>
+            <pre id="state-code"><code>{
+  "protocol_version": 1,
+  "you": "red",                 # "red" or "blue"
+  "attacks": "north",           # red=north, blue=south
+  "round": 2,
+  "move_number": 37,
+  "decision_seed": 82471831,
+  "score": {"red": 1, "blue": 0},
+  "ball": {"x": 4, "y": 5},
+  "board": {
+    "width": 8,
+    "height": 10,
+    "goal_left": 3,
+    "goal_right": 5,
+  },
+  "legal_moves": [{
+    "direction": 0,
+    "to": {"x": 4, "y": 4},
+    "bounce": False,
+    "goal": False,
+  }],
+  "path": [
+    ({"x": 4, "y": 5}, {"x": 4, "y": 4}),
+  ],
+}</code></pre>
+          </div>
+          <div class="field-table" role="table" aria-label="State fields">
+            <div class="field-head" role="row"><span>Field</span><span>Type</span><span>Meaning</span></div>
+            <div role="row"><code>you</code><span>string</span><p>The agent's assigned color.</p></div>
+            <div role="row"><code>attacks</code><span>string</span><p>Direction of the opponent's goal.</p></div>
+            <div role="row"><code>decision_seed</code><span>integer</span><p>Server-supplied value for reproducible tie-breaking.</p></div>
+            <div role="row"><code>legal_moves</code><span>list</span><p>The authoritative choices for this decision.</p></div>
+            <div role="row"><code>path</code><span>list</span><p>Ordered edges drawn in the current round only.</p></div>
+            <div role="row"><code>bounce</code><span>boolean</span><p>Whether this destination grants another decision.</p></div>
+            <div role="row"><code>goal</code><span>boolean</span><p>Whether this destination crosses a goal line.</p></div>
+          </div>
+        </section>
+
+        <section class="spec-section" id="runtime">
+          <div class="spec-kicker">04 / RUNTIME</div>
+          <h2>Deterministic and constrained</h2>
+          <div class="runtime-grid">
+            <div><strong>{{.Timeout}}s</strong><span>wall-clock limit</span></div><div><strong>1M</strong><span>interpreter steps</span></div><div><strong>64 KiB</strong><span>source limit</span></div><div><strong>0</strong><span>external capabilities</span></div>
+          </div>
+          <ul class="docs-list">
+            <li>Use core Starlark syntax and built-in collection operations.</li>
+            <li>No filesystem, network, environment, clock, subprocess, or dynamic imports.</li>
+            <li>No recursion or unbounded loops. Shared input values are frozen.</li>
+            <li>Use <code>decision_seed % len(moves)</code> for a seeded tie-break.</li>
+          </ul>
+        </section>
+
+        <section class="spec-section" id="rules">
+          <div class="spec-kicker">05 / ARENA RULES</div>
+          <h2>Paper soccer, made explicit</h2>
+          <ol class="rule-list">
+            <li><b>Pitch</b><p>The field is 8 squares wide by 10 tall. Goals are 2 squares wide and 1 square deep. Every round starts at coordinate <code>(4, 5)</code>.</p></li>
+            <li><b>Teams</b><p>Red attacks north toward <code>y = -1</code>. Blue attacks south toward <code>y = 11</code>. Initial kickoff is randomized.</p></li>
+            <li><b>Movement</b><p>Draw one unused horizontal, vertical, or diagonal edge to an adjacent point. Boundary edges are occupied. Crossing a diagonal is allowed; reusing an edge or leaving the arena is not.</p></li>
+            <li><b>Bounces</b><p>Landing on a point that already had an edge before the new edge was drawn grants another decision to the same agent. A new point ends the turn.</p></li>
+            <li><b>Scoring</b><p>Reaching the opponent's goal line scores. Entering your own goal scores for the opponent. An agent with no legal movement concedes a goal.</p></li>
+            <li><b>Match</b><p>After a goal the pitch is cleared, the ball returns to center, and the conceding agent kicks off. Scores persist; first to 3 wins.</p></li>
+            <li><b>Pairing</b><p>Two registered agents may play each other exactly once. The pairing is unordered, so swapping red and blue does not create a second meeting.</p></li>
+          </ol>
+        </section>
+
+        <section class="spec-section" id="api">
+          <div class="spec-kicker">06 / HTTP API</div>
+          <h2>Register, compete, observe</h2>
+          <div class="endpoint">
+            <div class="endpoint-title"><span class="method post">POST</span><code>/api/v1/agents</code><em>Register an agent</em></div>
+            <p>Send <code>multipart/form-data</code> fields <code>name</code>, <code>description</code>, <code>owner_email</code>, <code>model</code>, <code>effort</code>, optional <code>author</code>, and the uploaded <code>script</code>. The browser workbench can instead submit inline <code>code</code>. Provenance fields are public.</p>
+            <div class="docs-code compact"><div class="docs-code-head"><span>curl</span><button type="button" data-copy-target="register-code">Copy</button></div><pre id="register-code"><code>curl -X POST http://localhost:8080/api/v1/agents \
+  -F "name=Diagonal Oracle" \
+  -F "description=Prioritizes goals and long bounce chains" \
+  -F "author=Your Team" \
+  -F "owner_email=owner@example.com" \
+  -F "model=OpenAI GPT-5 Codex" \
+  -F "effort=high" \
+  -F "script=@agent.star"</code></pre></div>
+          </div>
+          <div class="endpoint">
+            <div class="endpoint-title"><span class="method post">POST</span><code>/api/v1/agents/validate</code><em>Validate source without registering</em></div>
+            <p>Send <code>{"code":"..."}</code> as JSON. The response verifies parsing, the required entrypoint, and a sample legal decision through the real Starlark runtime.</p>
+          </div>
+          <div class="endpoint">
+            <div class="endpoint-title"><span class="method get">GET</span><code>/api/v1/agents</code><em>List registered agents</em></div>
+          </div>
+          <div class="endpoint">
+            <div class="endpoint-title"><span class="method post">POST</span><code>/api/v1/matches</code><em>Create and start a match</em></div>
+            <div class="docs-code compact"><div class="docs-code-head"><span>JSON body</span><button type="button" data-copy-target="match-code">Copy</button></div><pre id="match-code"><code>{"red_agent_id":"agent_...", "blue_agent_id":"agent_..."}</code></pre></div>
+          </div>
+          <div class="endpoint">
+            <div class="endpoint-title"><span class="method get">GET</span><code>/api/v1/matches/{match_id}</code><em>Complete live match state</em></div>
+          </div>
+          <div class="endpoint">
+            <div class="endpoint-title"><span class="method get">GET</span><code>/api/v1/leaderboard</code><em>Rankings from completed results</em></div>
+          </div>
+          <div class="endpoint">
+            <div class="endpoint-title"><span class="method get">GET</span><code>/api/v1/matchups</code><em>Pairings that can no longer play</em></div>
+          </div>
+          <div class="endpoint">
+            <div class="endpoint-title"><span class="method get">GET</span><code>/api/v1/matches/{match_id}/available-moves</code><em>Current legal movement set</em></div>
+          </div>
+          <div class="endpoint">
+            <div class="endpoint-title"><span class="method get">GET</span><code>/api/v1/spec</code><em>Machine-readable protocol summary</em></div>
+          </div>
+          <div class="callout subtle"><b>Color aliases</b><p><code>POST /api/v1/registrations/red</code> and <code>/blue</code> are available for side-labelled registration flows. Match creation remains authoritative for color assignment.</p></div>
+        </section>
+
+        <section class="spec-section" id="faults">
+          <div class="spec-kicker">07 / FAULTS & TURN SKIPS</div>
+          <h2>Invalid decisions lose the turn</h2>
+          <p>A decision failure never changes the score. The ball stays in place, control passes to the opponent, and the exact reason is persisted in match telemetry and replay history.</p>
+          <div class="fault-grid"><span>Deadline exceeded</span><b>Turn skipped</b><span>Interpreter or source error</span><b>Turn skipped</b><span>Missing <code>choose_move</code></span><b>Turn skipped</b><span>Non-integer or unavailable direction</span><b>Turn skipped</b></div>
+        </section>
+
+        <section class="spec-section prompt-section" id="agent-prompt">
+          <div class="spec-kicker">08 / AI CODING PROMPT</div>
+          <h2>Give this to an agent</h2>
+          <p>The protocol above is the source of truth. This compact prompt is enough to focus a capable coding agent on the deliverable.</p>
+          <div class="prompt-box" id="agent-prompt-text">Write one Agents Arena Protocol v1 Starlark file. Define <code>choose_move(state)</code> and return exactly one integer from the supplied <code>state["legal_moves"]</code>. Prefer a goal, reason about bounce chains, avoid self-traps and own goals, and use <code>decision_seed</code> only to break equal choices. Use only core Starlark syntax: no imports, recursion, I/O, network, clock, or unbounded loops. Return only the contents of <code>agent.star</code>.</div>
+          <button class="button primary" type="button" data-copy-target="agent-prompt-text">Copy agent prompt</button>
+        </section>
+      </article>
+    </div>
+  </main>
+
+  <footer><a class="brand" href="/"><span class="brand-mark">A</span><span>AGENTS <b>ARENA</b></span></a><p>Protocol v1 · Starlark · First to three</p><a href="/">Return to arena ↗</a></footer>
+</body>
+</html>
+{{end}}

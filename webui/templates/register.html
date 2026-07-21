@@ -1,0 +1,66 @@
+{{define "register.html"}}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Register and validate a Starlark contender for Agents Arena.">
+  <title>{{.Title}} · Agents Arena</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/vendor/htmx.min.js" defer></script>
+  <script src="/static/register.js" defer></script>
+</head>
+<body class="register-body">
+  <div class="noise"></div>
+  <header class="site-header compact">
+    <a class="brand" href="/"><span class="brand-mark">A</span><span>AGENTS <b>ARENA</b></span></a>
+    <div class="workbench-status"><span class="live-dot"></span> AGENT WORKBENCH</div>
+    <div class="match-links"><a class="back-link" href="/spec">Protocol</a><a class="back-link" href="/">← Arena lobby</a></div>
+  </header>
+
+  <main class="register-shell">
+    <section class="register-heading">
+      <div><div class="eyebrow">NEW CONTENDER / STARLARK</div><h1>Register<br>your agent.</h1></div>
+      <p>Name the contender, record who owns it and how it was developed, then write and validate the exact code that will compete. Registration remains disabled until the arena runtime accepts the script.</p>
+    </section>
+
+    <form class="workbench" hx-post="/agents" hx-target="#registration-result" hx-swap="innerHTML">
+      <section class="identity-panel">
+        <div class="workbench-panel-head"><span>01</span><div><b>IDENTITY</b><small>Public roster information</small></div></div>
+        <div class="identity-fields">
+          <label><span>Agent name <i>required</i></span><input name="name" maxlength="48" placeholder="Diagonal Oracle" required autocomplete="off"><small><b id="name-count">0</b> / 48</small></label>
+          <label><span>Author or team <i>optional</i></span><input name="author" maxlength="64" placeholder="Anonymous"><small><b id="author-count">0</b> / 64</small></label>
+          <label class="description-field"><span>Description <i>required</i></span><textarea name="description" id="agent-description" maxlength="500" rows="5" placeholder="Explain the strategy, priorities, and intended play style…" required></textarea><small><b id="description-count">0</b> / 500</small></label>
+          <div class="provenance-fields">
+            <label><span>Owner email <i>required</i></span><input type="email" name="owner_email" maxlength="254" placeholder="owner@example.com" required autocomplete="email"></label>
+            <label><span>Development model <i>required</i></span><input name="model" maxlength="80" placeholder="OpenAI GPT-5 Codex" required autocomplete="off"><small><b id="model-count">0</b> / 80</small></label>
+            <label><span>Effort level <i>required</i></span><select name="effort" required><option value="" selected disabled>Select effort</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="xhigh">XHigh</option><option value="max">Max</option></select></label>
+          </div>
+        </div>
+        <div class="identity-note"><b>VISIBLE TO EVERYONE</b><p>Name, author, description, owner email, development model, and effort level appear in the public roster and API. Submitted source is stored for match execution but is never returned.</p></div>
+      </section>
+
+      <section class="editor-panel">
+        <div class="workbench-panel-head"><span>02</span><div><b>ALGORITHM</b><small>agent.star · Protocol v1</small></div><a href="/spec#contract">View contract ↗</a></div>
+        <div class="editor-toolbar"><span><i></i><i></i><i></i></span><b>agent.star</b><div><em>STARLARK</em><span id="code-size">0 B / 64 KiB</span></div></div>
+        <div class="code-editor" id="code-editor">
+          <pre id="code-highlight" class="code-highlight" aria-hidden="true"><code></code></pre>
+          <textarea name="code" id="agent-code" aria-label="Starlark agent code" spellcheck="false" autocomplete="off" autocapitalize="off" required>{{.Script}}</textarea>
+        </div>
+        <div class="validation-panel" id="validation-panel" data-state="checking" aria-live="polite">
+          <div class="validation-icon"><span></span></div>
+          <div><b id="validation-title">Checking script…</b><p id="validation-message">Sending the current source to the arena runtime.</p><ul id="validation-checks"></ul></div>
+          <button type="button" id="validate-code">Validate now</button>
+        </div>
+      </section>
+
+      <section class="submit-panel">
+        <div><span>REGISTRATION GATE</span><strong id="gate-label">Waiting for valid code</strong></div>
+        <button class="button primary" id="register-agent" type="submit" disabled>Register agent & join roster</button>
+        <div id="registration-result" aria-live="polite"></div>
+      </section>
+    </form>
+  </main>
+</body>
+</html>
+{{end}}

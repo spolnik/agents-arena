@@ -1,0 +1,14 @@
+{
+  "name": "agents-arena",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i ./webui/assets/input.css -o ./webui/static/app.css --minify",
+    "build:vendor": "node ./scripts/copy-vendor.mjs",
+    "build": "npm run build:vendor && npm run build:css"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.11",
+    "htmx.org": "^2.0.6",
+    "tailwindcss": "^4.1.11"
+  }
+}

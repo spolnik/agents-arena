@@ -1,0 +1,133 @@
+{{define "home.html"}}
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A deterministic paper-soccer arena for autonomous agents.">
+  <title>{{.Title}}</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/vendor/htmx.min.js" defer></script>
+  <script src="/static/matchmaker.js" defer></script>
+</head>
+<body>
+  <div class="noise"></div>
+  <header class="site-header">
+    <a class="brand" href="/"><span class="brand-mark">A</span><span>AGENTS <b>ARENA</b></span></a>
+    <nav aria-label="Primary navigation">
+      <a href="#arena">Arena</a><a href="#agents">Agents</a><a href="/history">History</a><a href="/spec">Full spec</a>
+      <a class="nav-cta" href="/register">Enter agent</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" id="arena">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="live-dot"></span> deterministic autonomous competition</div>
+        <h1>Code the player.<br><em>Watch it think.</em></h1>
+        <p>Two algorithms. One paper pitch. Every edge is a decision, every decision has five seconds, and the first agent to three goals owns the arena.</p>
+        <div class="hero-actions">
+          <a class="button primary" href="#matchmaker">Launch a match <span>↗</span></a>
+          <a class="button ghost" href="/spec">Read the protocol</a>
+        </div>
+        <div class="hero-stats">
+          <div><strong>8 × 10</strong><span>competition grid</span></div>
+          <div><strong>&lt; 5s</strong><span>per edge</span></div>
+          <div><strong>3 goals</strong><span>to victory</span></div>
+        </div>
+      </div>
+      <div class="hero-board" aria-hidden="true">
+        <div class="board-glow"></div>
+        <div class="mini-score"><span class="red">RED 2</span><b>:</b><span class="blue">1 BLUE</span></div>
+        <div class="grid-pitch">
+          <div class="goal goal-top"></div><div class="goal goal-bottom"></div>
+          <span class="demo-path path-a"></span><span class="demo-path path-b"></span><span class="demo-path path-c"></span><span class="demo-ball"></span>
+        </div>
+        <div class="decision-card"><span>DECISION 042</span><b>NORTH-EAST</b><i>12.8 ms</i></div>
+      </div>
+    </section>
+
+    <section class="section split" id="matchmaker">
+      <div>
+        <div class="section-label">01 / Matchmaker</div>
+        <h2>Put two minds<br>on the pitch.</h2>
+        <p class="section-lead">Colors define direction: red attacks north, blue attacks south. Kickoff is randomized; after a goal, the conceding agent restarts.</p>
+      </div>
+      <form class="panel match-form" id="matchmaker-form" hx-post="/matches" hx-target="#match-result" hx-swap="innerHTML">
+        <div class="versus-selects">
+          <div class="opponent-slot red-slot">
+            <label><span class="team-label red">RED AGENT</span><select name="red_agent_id" required>{{range .Agents}}<option value="{{.ID}}" data-name="{{.Name}}" data-author="{{.Author}}" data-owner="{{.OwnerEmail}}" data-model="{{.Model}}" data-effort="{{.Effort}}" {{if eq .Name "Full Press"}}selected{{end}}>{{.Name}} · {{.Model}} / {{.Effort}} · {{.OwnerEmail}}</option>{{end}}</select></label>
+            <div class="opponent-preview" id="red-preview"><span class="opponent-monogram" data-role="monogram">—</span><div><strong data-role="name">Choose an agent</strong><small data-role="owner"></small><span data-role="tech"></span></div></div>
+          </div>
+          <div class="versus">VS</div>
+          <div class="opponent-slot blue-slot">
+            <label><span class="team-label blue">BLUE AGENT</span><select name="blue_agent_id" required>{{range .Agents}}<option value="{{.ID}}" data-name="{{.Name}}" data-author="{{.Author}}" data-owner="{{.OwnerEmail}}" data-model="{{.Model}}" data-effort="{{.Effort}}" {{if eq .Name "Iron Curtain"}}selected{{end}}>{{.Name}} · {{.Model}} / {{.Effort}} · {{.OwnerEmail}}</option>{{end}}</select></label>
+            <div class="opponent-preview" id="blue-preview"><span class="opponent-monogram" data-role="monogram">—</span><div><strong data-role="name">Choose an agent</strong><small data-role="owner"></small><span data-role="tech"></span></div></div>
+          </div>
+        </div>
+        <p class="matchup-rule" id="matchup-rule">Each pair of agents can meet once. Color order does not create a rematch.</p>
+        <button class="button primary wide" id="start-match" type="submit">Randomize kickoff & start</button>
+        <div id="match-result" aria-live="polite"></div>
+      </form>
+    </section>
+
+    <section class="section" id="agents">
+      <div class="section-heading">
+        <div><div class="section-label">02 / Roster</div><h2>Registered agents</h2></div>
+        <span class="count-badge">{{len .Agents}} online</span>
+      </div>
+      <div class="agent-grid">
+        {{range $index, $agent := .Agents}}
+        <article class="agent-card" data-model="{{.Model}}">
+          <div class="agent-rank">#{{printf "%02d" (addOne $index)}}</div>
+          <div class="agent-avatar">{{slice .Name 0 1}}</div>
+          <div><h3>{{.Name}}</h3><p class="agent-owner">by {{.Author}} · <a href="mailto:{{.OwnerEmail}}">{{.OwnerEmail}}</a></p><p class="agent-description">{{.Description}}</p><div class="agent-provenance"><span>{{.Model}} · {{.Effort}} effort</span></div></div>
+          <span class="verified">STARLARK</span>
+        </article>
+        {{else}}<p>No agents registered yet.</p>{{end}}
+      </div>
+    </section>
+
+    <section class="section leaderboard-section" id="leaderboard">
+      <div class="section-heading">
+        <div><div class="section-label">03 / Rankings</div><h2>Agent leaderboard</h2></div>
+        <a class="count-badge" href="/history">Full standings ↗</a>
+      </div>
+      <div class="leaderboard-table">
+        <div class="leaderboard-row leaderboard-head"><span>Rank</span><span>Agent</span><span>Played</span><span>Wins</span><span>Losses</span><span>Goals</span><span>Pts</span></div>
+        {{range .Leaderboard}}<div class="leaderboard-row"><strong>#{{printf "%02d" .Rank}}</strong><div class="rank-agent" data-model="{{.Model}}"><b>{{.Name}}</b><small>{{.Author}} · {{.OwnerEmail}}</small><span class="agent-tech">{{.Model}} · {{.Effort}} effort</span></div><span>{{.Played}}</span><span>{{.Wins}}</span><span>{{.Losses}}</span><span>{{.GoalsFor}}:{{.GoalsAgainst}}</span><em>{{.Points}}</em></div>{{end}}
+      </div>
+    </section>
+
+    <section class="section split protocol" id="protocol">
+      <div>
+        <div class="section-label">04 / Agent protocol v1</div>
+        <h2>Python-shaped.<br>Sandbox-minded.</h2>
+        <p class="section-lead">Submit a single Starlark file. The arena calls one pure function with the complete board and the legal choices. Return one direction; the server validates everything else.</p>
+        <ul class="feature-list">
+          <li><span>01</span><div><b>Easy for coding agents</b><p>Familiar Python syntax, tiny surface area, one function.</p></div></li>
+          <li><span>02</span><div><b>Safe by construction</b><p>No filesystem, network, clock, subprocesses, or imports.</p></div></li>
+          <li><span>03</span><div><b>Reproducible matches</b><p>Hermetic execution, server seed, step and wall-clock limits.</p></div></li>
+        </ul>
+      </div>
+      <div class="code-window">
+        <div class="code-top"><span><i></i><i></i><i></i></span><b>agent.star</b><em>STARLARK</em></div>
+        <pre><code>{{.Script}}</code></pre>
+        <div class="direction-strip"><span><b>0</b>N</span><span><b>1</b>NE</span><span><b>2</b>E</span><span><b>3</b>SE</span><span><b>4</b>S</span><span><b>5</b>SW</span><span><b>6</b>W</span><span><b>7</b>NW</span></div>
+      </div>
+    </section>
+
+    <section class="section register" id="register">
+      <div class="register-copy"><div class="section-label">05 / Registration</div><h2>Enter your contender.</h2><p>Describe the agent, write its Starlark strategy in the browser, and validate it against the real arena runtime before registration.</p></div>
+      <div class="register-cta-card"><span>INLINE STARLARK WORKBENCH</span><strong>Syntax highlighting.<br>Live runtime validation.</strong><p>The registration workbench checks parsing, verifies <code>choose_move(state)</code>, and runs a sample legal decision.</p><a class="button primary" href="/register">Open registration workbench ↗</a></div>
+    </section>
+
+    {{if .Matches}}<section class="section recent">
+      <div class="section-heading"><div><div class="section-label">06 / Archive</div><h2>Recent matches</h2></div><a class="count-badge" href="/history">All matches ↗</a></div>
+      <div class="match-list">{{range .Matches}}<a class="match-row" href="/matches/{{.ID}}?replay=1"><span class="match-agent red-side"><strong>{{.RedName}}</strong><small>{{.RedAuthor}} · {{.RedOwnerEmail}}</small><i>{{.RedModel}} · {{.RedEffort}} effort</i></span><b class="red">{{.RedScore}}</b><i class="score-divider">:</i><b class="blue">{{.BlueScore}}</b><span class="match-agent blue-side"><strong>{{.BlueName}}</strong><small>{{.BlueAuthor}} · {{.BlueOwnerEmail}}</small><i>{{.BlueModel}} · {{.BlueEffort}} effort</i></span><em>Replay ↗</em></a>{{end}}</div>
+    </section>{{end}}
+  </main>
+  <footer><a class="brand" href="/"><span class="brand-mark">A</span><span>AGENTS <b>ARENA</b></span></a><p>Paper soccer, engineered for autonomous minds.</p><a href="/spec">Agent & API specification ↗</a></footer>
+</body>
+</html>
+{{end}}
