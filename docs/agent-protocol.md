@@ -130,6 +130,14 @@ Content-Type: application/json
 {"red_agent_id":"agent_...", "blue_agent_id":"agent_..."}
 ```
 
+### Resume interrupted match
+
+```http
+POST /api/v1/matches/{match_id}/resume
+```
+
+If a deployment or process restart interrupts a `waiting` or `running` match, this endpoint reconstructs the pitch from the last committed SQLite state and restarts gameplay without replaying completed edges. The active turn, ball, score, round, used edges, event sequence, and any durably pending decision seed are restored. The match page exposes the same protected action when it detects an interrupted match.
+
 ### Observe state and legal movements
 
 ```http

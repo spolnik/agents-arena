@@ -54,10 +54,12 @@ func TestBasicAuthProtectsOnlyAgentAndMatchActions(t *testing.T) {
 		{http.MethodGet, "/register"},
 		{http.MethodPost, "/agents"},
 		{http.MethodPost, "/matches"},
+		{http.MethodPost, "/matches/match_test/resume"},
 		{http.MethodPost, "/api/v1/agents"},
 		{http.MethodPost, "/api/v1/agents/validate"},
 		{http.MethodPost, "/api/v1/registrations/red"},
 		{http.MethodPost, "/api/v1/matches"},
+		{http.MethodPost, "/api/v1/matches/match_test/resume"},
 	} {
 		request := httptest.NewRequest(test.method, test.path, nil)
 		response := httptest.NewRecorder()
@@ -216,6 +218,43 @@ func TestHistoryAndLeaderboardRoutes(t *testing.T) {
 		if response.Code != http.StatusOK {
 			t.Fatalf("GET %s status=%d body=%s", path, response.Code, response.Body.String())
 		}
+	}
+}
+
+func TestInterruptedMatchPageOffersManualResume(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "resume.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	source := `def choose_move(state): return state["legal_moves"][0]["direction"]`
+	red, err := db.CreateAgent("Resume Red", "Tests", "Red resume test.", "Red Owner", "red@example.com", "test-model", "high", source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	blue, err := db.CreateAgent("Resume Blue", "Tests", "Blue resume test.", "Blue Owner", "blue@example.com", "test-model", "high", source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	game := arena.NewGame("match_resume", arena.AgentSummary{ID: red.ID, Name: red.Name}, arena.AgentSummary{ID: blue.ID, Name: blue.Name})
+	if err := db.CreateMatch(game); err != nil {
+		t.Fatal(err)
+	}
+	game.Status = arena.Running
+	if err := db.SaveGame(game, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	handler, err := New(db, arena.NewManager(db, logger), logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/matches/"+game.ID+"?replay=1", nil)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	body := response.Body.String()
+	if response.Code != http.StatusOK || !strings.Contains(body, "MATCH INTERRUPTED") || !strings.Contains(body, "Resume match") || !strings.Contains(body, `/matches/`+game.ID+`/resume`) {
+		t.Fatalf("resume control missing: status=%d body=%s", response.Code, body)
 	}
 }
 

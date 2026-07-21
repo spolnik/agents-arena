@@ -62,6 +62,11 @@ CREATE TABLE IF NOT EXISTS matches (
     winner TEXT NOT NULL DEFAULT '',
     round INTEGER NOT NULL DEFAULT 1,
     message TEXT NOT NULL DEFAULT '',
+	turn TEXT NOT NULL DEFAULT '',
+	ball_x INTEGER NOT NULL DEFAULT 4,
+	ball_y INTEGER NOT NULL DEFAULT 5,
+	decision_seed INTEGER NOT NULL DEFAULT 0,
+	decision_pending INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -105,6 +110,11 @@ CREATE INDEX IF NOT EXISTS matches_created_idx ON matches(created_at DESC);
 		`ALTER TABLE agents ADD COLUMN model TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE agents ADD COLUMN effort TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE matches ADD COLUMN pair_key TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE matches ADD COLUMN turn TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE matches ADD COLUMN ball_x INTEGER NOT NULL DEFAULT 4`,
+		`ALTER TABLE matches ADD COLUMN ball_y INTEGER NOT NULL DEFAULT 5`,
+		`ALTER TABLE matches ADD COLUMN decision_seed INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE matches ADD COLUMN decision_pending INTEGER NOT NULL DEFAULT 0`,
 	} {
 		if _, err := s.db.Exec(statement); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
 			return err
@@ -327,13 +337,16 @@ ORDER BY MIN(created_at)`)
 
 func (s *Store) GetMatch(id string) (*arena.Game, error) {
 	game := &arena.Game{}
-	var status, winner, created string
+	var status, winner, created, storedTurn string
+	var decisionPending int
 	err := s.db.QueryRow(`
 SELECT m.id,
        r.id,r.name,r.author,r.owner_name,r.model,r.effort,
        b.id,b.name,b.author,b.owner_name,b.model,b.effort,
        m.status,m.red_score,m.blue_score,
-       m.winner, m.round, m.message, m.created_at
+       m.winner, m.round, m.message,
+	   m.turn, m.ball_x, m.ball_y, m.decision_seed, m.decision_pending,
+	   m.created_at
 FROM matches m
 JOIN agents r ON r.id=m.red_agent_id
 JOIN agents b ON b.id=m.blue_agent_id
@@ -341,15 +354,24 @@ WHERE m.id=?`, id).Scan(
 		&game.ID,
 		&game.RedAgent.ID, &game.RedAgent.Name, &game.RedAgent.Author, &game.RedAgent.OwnerName, &game.RedAgent.Model, &game.RedAgent.Effort,
 		&game.BlueAgent.ID, &game.BlueAgent.Name, &game.BlueAgent.Author, &game.BlueAgent.OwnerName, &game.BlueAgent.Model, &game.BlueAgent.Effort,
-		&status, &game.RedScore, &game.BlueScore, &winner, &game.Round, &game.LastMessage, &created,
+		&status, &game.RedScore, &game.BlueScore, &winner, &game.Round, &game.LastMessage,
+		&storedTurn, &game.Ball.X, &game.Ball.Y, &game.DecisionSeed, &decisionPending, &created,
 	)
 	if err != nil {
 		return nil, err
 	}
 	game.Status = arena.Status(status)
 	game.Winner = arena.Color(winner)
-	game.Ball = arena.Point{X: 4, Y: 5}
-	game.Turn = arena.Red
+	game.DecisionPending = decisionPending != 0
+	hasStoredState := storedTurn == string(arena.Red) || storedTurn == string(arena.Blue)
+	if hasStoredState {
+		game.Turn = arena.Color(storedTurn)
+	} else {
+		game.Ball = arena.Point{X: 4, Y: 5}
+		game.Turn = arena.Red
+		game.DecisionSeed = 0
+		game.DecisionPending = false
+	}
 	game.Moves = make([]arena.Move, 0)
 	game.Events = make([]arena.MatchEvent, 0)
 
@@ -372,12 +394,16 @@ FROM moves WHERE match_id=? ORDER BY number`, id)
 		game.MoveNumber = move.Number
 		if move.Round == game.Round {
 			game.Path = append(game.Path, arena.Edge{From: move.From, To: move.To})
-			game.Ball = move.To
+			if !hasStoredState {
+				game.Ball = move.To
+			}
 		}
-		if move.Bounce {
-			game.Turn = move.Player
-		} else {
-			game.Turn = move.Player.Opponent()
+		if !hasStoredState {
+			if move.Bounce {
+				game.Turn = move.Player
+			} else {
+				game.Turn = move.Player.Opponent()
+			}
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -408,13 +434,17 @@ FROM match_events WHERE match_id=? ORDER BY number`, id)
 	if err := eventRows.Err(); err != nil {
 		return nil, err
 	}
+	if err := game.RestoreRuntime(); err != nil {
+		return nil, err
+	}
 	return game, nil
 }
 
 func (s *Store) CreateMatch(game *arena.Game) error {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	_, err := s.db.Exec(`INSERT INTO matches(id,red_agent_id,blue_agent_id,pair_key,status,red_score,blue_score,winner,round,message,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
-		game.ID, game.RedAgent.ID, game.BlueAgent.ID, pairKey(game.RedAgent.ID, game.BlueAgent.ID), game.Status, game.RedScore, game.BlueScore, game.Winner, game.Round, game.LastMessage, now, now)
+	_, err := s.db.Exec(`INSERT INTO matches(id,red_agent_id,blue_agent_id,pair_key,status,red_score,blue_score,winner,round,message,turn,ball_x,ball_y,decision_seed,decision_pending,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		game.ID, game.RedAgent.ID, game.BlueAgent.ID, pairKey(game.RedAgent.ID, game.BlueAgent.ID), game.Status, game.RedScore, game.BlueScore, game.Winner, game.Round, game.LastMessage,
+		game.Turn, game.Ball.X, game.Ball.Y, game.DecisionSeed, game.DecisionPending, now, now)
 	if err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed") && strings.Contains(err.Error(), "matches.pair_key") {
 		return arena.ErrPairAlreadyPlayed
 	}
@@ -434,8 +464,10 @@ func (s *Store) SaveGame(game *arena.Game, move *arena.Move, event *arena.MatchE
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.Exec(`UPDATE matches SET status=?,red_score=?,blue_score=?,winner=?,round=?,message=?,updated_at=? WHERE id=?`,
-		game.Status, game.RedScore, game.BlueScore, game.Winner, game.Round, game.LastMessage, time.Now().UTC().Format(time.RFC3339Nano), game.ID)
+	_, err = tx.Exec(`UPDATE matches SET status=?,red_score=?,blue_score=?,winner=?,round=?,message=?,turn=?,ball_x=?,ball_y=?,decision_seed=?,decision_pending=?,updated_at=? WHERE id=?`,
+		game.Status, game.RedScore, game.BlueScore, game.Winner, game.Round, game.LastMessage,
+		game.Turn, game.Ball.X, game.Ball.Y, game.DecisionSeed, game.DecisionPending,
+		time.Now().UTC().Format(time.RFC3339Nano), game.ID)
 	if err != nil {
 		return err
 	}

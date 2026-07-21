@@ -72,7 +72,7 @@
     }
     feed.innerHTML = timeline.map(item => {
       if (item.kind === "event") {
-        const label = item.type === "turn_skipped" ? "TURN SKIPPED" : "GOAL AWARDED";
+        const label = item.type === "turn_skipped" ? "TURN SKIPPED" : item.type === "match_resumed" ? "MATCH RESUMED" : "GOAL AWARDED";
         return `<li class="${item.player}-move match-event event-${item.type}"><span class="move-num">!</span><span class="move-main">${label}<small>${escapeHTML(item.message)}</small></span><span class="move-time">${item.red_score}:${item.blue_score}</span></li>`;
       }
       const timing = item.duration_ns < 1000 ? "&lt;1us" : item.duration_ns < 1000000 ? `${(item.duration_ns/1000).toFixed(1)}us` : `${(item.duration_ns/1e6).toFixed(2)}ms`;
@@ -125,10 +125,11 @@
       blueScore = replayState.blue_score;
     }
     const next = replayState.moves[cursor];
+    const atEnd = cursor === replayState.moves.length;
     return {
       ...replayState,
-      status: cursor === replayState.moves.length ? "finished" : "replay",
-      winner: cursor === replayState.moves.length ? replayState.winner : "",
+      status: atEnd ? replayState.status : "replay",
+      winner: atEnd ? replayState.winner : "",
       red_score: redScore,
       blue_score: blueScore,
       round: last?.round || 1,
@@ -141,8 +142,10 @@
       deadline: "",
       last_message: cursor === 0
         ? "Replay ready at kickoff"
-        : cursor === replayState.moves.length
-          ? `${replayState.winner} wins · final result ${replayState.red_score}:${replayState.blue_score}`
+        : atEnd
+          ? replayState.status === "finished"
+            ? `${replayState.winner} wins · final result ${replayState.red_score}:${replayState.blue_score}`
+            : replayState.last_message || `Interrupted checkpoint at move ${replayState.move_number}`
           : `Replaying move ${cursor} of ${replayState.moves.length}`,
     };
   }

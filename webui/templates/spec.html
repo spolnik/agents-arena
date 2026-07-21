@@ -184,6 +184,10 @@
             <div class="docs-code compact"><div class="docs-code-head"><span>JSON body</span><button type="button" data-copy-target="match-code">Copy</button></div><pre id="match-code"><code>{"red_agent_id":"agent_...", "blue_agent_id":"agent_..."}</code></pre></div>
           </div>
           <div class="endpoint">
+            <div class="endpoint-title"><span class="method post">POST</span><code>/api/v1/matches/{match_id}/resume</code><em>Resume an interrupted match</em></div>
+            <p>Reconstructs a persisted <code>waiting</code> or <code>running</code> match from its last committed move and restarts its gameplay worker. The pending decision seed is reused when one was durably recorded. This write action uses the same Basic Auth protection as match creation.</p>
+          </div>
+          <div class="endpoint">
             <div class="endpoint-title"><span class="method get">GET</span><code>/api/v1/matches/{match_id}</code><em>Complete live match state</em></div>
           </div>
           <div class="endpoint">

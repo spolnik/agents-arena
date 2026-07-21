@@ -43,6 +43,7 @@ type pageData struct {
 	Leaderboard []store.LeaderboardRow
 	Game        *arena.Game
 	Replay      bool
+	Resumable   bool
 	Error       string
 	Notice      string
 	Script      string
@@ -88,6 +89,7 @@ func NewWithBasicAuth(db *store.Store, manager *arena.Manager, logger *slog.Logg
 	mux.HandleFunc("GET /history", s.historyPage)
 	mux.Handle("POST /agents", protected(s.registerAgent))
 	mux.Handle("POST /matches", protected(s.createMatch))
+	mux.Handle("POST /matches/{id}/resume", protected(s.resumeMatch))
 	mux.HandleFunc("GET /matches/{id}", s.matchPage)
 	mux.HandleFunc("GET /api/v1/agents", s.listAgentsAPI)
 	mux.HandleFunc("GET /api/v1/leaderboard", s.leaderboardAPI)
@@ -96,6 +98,7 @@ func NewWithBasicAuth(db *store.Store, manager *arena.Manager, logger *slog.Logg
 	mux.Handle("POST /api/v1/agents/validate", protected(s.validateAgentAPI))
 	mux.Handle("POST /api/v1/registrations/{color}", protected(s.registerColorAPI))
 	mux.Handle("POST /api/v1/matches", protected(s.createMatchAPI))
+	mux.Handle("POST /api/v1/matches/{id}/resume", protected(s.resumeMatchAPI))
 	mux.HandleFunc("GET /api/v1/matches/{id}", s.matchAPI)
 	mux.HandleFunc("GET /api/v1/matches/{id}/available-moves", s.availableMovesAPI)
 	mux.HandleFunc("GET /api/v1/spec", s.specAPI)
@@ -357,6 +360,32 @@ func (s *Server) createMatchAPI(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, game)
 }
 
+func (s *Server) resumeMatch(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if _, err := s.manager.Resume(id); err != nil {
+		if errors.Is(err, arena.ErrMatchAlreadyActive) {
+			http.Redirect(w, r, "/matches/"+id, http.StatusSeeOther)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	http.Redirect(w, r, "/matches/"+id, http.StatusSeeOther)
+}
+
+func (s *Server) resumeMatchAPI(w http.ResponseWriter, r *http.Request) {
+	game, err := s.manager.Resume(r.PathValue("id"))
+	if err != nil {
+		if errors.Is(err, arena.ErrMatchAlreadyActive) || errors.Is(err, arena.ErrMatchNotResumable) {
+			writeError(w, http.StatusConflict, err)
+			return
+		}
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, game)
+}
+
 func (s *Server) matchPage(w http.ResponseWriter, r *http.Request) {
 	game, ok := s.manager.Get(r.PathValue("id"))
 	if !ok {
@@ -367,8 +396,9 @@ func (s *Server) matchPage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	resumable := !ok && (game.Status == arena.Running || game.Status == arena.Waiting)
 	replay := r.URL.Query().Get("replay") == "1" || !ok
-	s.render(w, "match.html", pageData{Title: game.RedAgent.Name + " vs " + game.BlueAgent.Name, Game: game, Replay: replay, Timeout: 5})
+	s.render(w, "match.html", pageData{Title: game.RedAgent.Name + " vs " + game.BlueAgent.Name, Game: game, Replay: replay, Resumable: resumable, Timeout: 5})
 }
 
 func (s *Server) matchAPI(w http.ResponseWriter, r *http.Request) {
@@ -441,8 +471,9 @@ func (s *Server) specAPI(w http.ResponseWriter, _ *http.Request) {
 		"registration_fields":     []string{"name", "description", "owner_name", "owner_email", "model", "effort", "author", "script|code"},
 		"pairing_rule":            "each unordered pair of agents may play exactly once",
 		"competition_endpoints": []string{
-			"GET /api/v1/leaderboard", "GET /api/v1/matchups", "GET /api/v1/matches/{match_id}",
+			"GET /api/v1/leaderboard", "GET /api/v1/matchups", "GET /api/v1/matches/{match_id}", "POST /api/v1/matches/{match_id}/resume",
 		},
+		"match_resumption": "an interrupted waiting or running match can be resumed manually from its last committed move",
 	})
 }
 

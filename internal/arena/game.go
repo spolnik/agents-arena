@@ -83,27 +83,29 @@ var directions = [8]Point{
 }
 
 type Game struct {
-	ID          string       `json:"id"`
-	RedAgent    AgentSummary `json:"red_agent"`
-	BlueAgent   AgentSummary `json:"blue_agent"`
-	Status      Status       `json:"status"`
-	Turn        Color        `json:"turn"`
-	Ball        Point        `json:"ball"`
-	RedScore    int          `json:"red_score"`
-	BlueScore   int          `json:"blue_score"`
-	Round       int          `json:"round"`
-	MoveNumber  int          `json:"move_number"`
-	Winner      Color        `json:"winner,omitempty"`
-	Deadline    time.Time    `json:"deadline,omitempty"`
-	LastMessage string       `json:"last_message,omitempty"`
-	Path        []Edge       `json:"path"`
-	Available   []LegalMove  `json:"legal_moves"`
-	Moves       []Move       `json:"moves"`
-	Events      []MatchEvent `json:"events"`
-	createdAt   time.Time
-	eventNumber int
-	used        map[string]bool
-	degree      map[Point]int
+	ID              string       `json:"id"`
+	RedAgent        AgentSummary `json:"red_agent"`
+	BlueAgent       AgentSummary `json:"blue_agent"`
+	Status          Status       `json:"status"`
+	Turn            Color        `json:"turn"`
+	Ball            Point        `json:"ball"`
+	RedScore        int          `json:"red_score"`
+	BlueScore       int          `json:"blue_score"`
+	Round           int          `json:"round"`
+	MoveNumber      int          `json:"move_number"`
+	Winner          Color        `json:"winner,omitempty"`
+	Deadline        time.Time    `json:"deadline,omitempty"`
+	LastMessage     string       `json:"last_message,omitempty"`
+	Path            []Edge       `json:"path"`
+	Available       []LegalMove  `json:"legal_moves"`
+	Moves           []Move       `json:"moves"`
+	Events          []MatchEvent `json:"events"`
+	DecisionSeed    int64        `json:"-"`
+	DecisionPending bool         `json:"-"`
+	createdAt       time.Time
+	eventNumber     int
+	used            map[string]bool
+	degree          map[Point]int
 }
 
 type AgentSummary struct {
@@ -168,6 +170,42 @@ func (g *Game) addBoundary() {
 		g.markUsed(Point{x, -1}, Point{x + 1, -1})
 		g.markUsed(Point{x, 11}, Point{x + 1, 11})
 	}
+}
+
+// RestoreRuntime rebuilds the derived board indexes and event counter that are
+// intentionally not stored in SQLite. The persisted path remains the source of
+// truth for the current round.
+func (g *Game) RestoreRuntime() error {
+	g.used = make(map[string]bool)
+	g.degree = make(map[Point]int)
+	g.addBoundary()
+	for _, edge := range g.Path {
+		if !segmentInsideArena(edge.From, edge.To) {
+			return fmt.Errorf("persisted edge from %v to %v is outside the arena", edge.From, edge.To)
+		}
+		key := edgeKey(edge.From, edge.To)
+		if g.used[key] {
+			return fmt.Errorf("persisted edge from %v to %v is duplicated or occupied", edge.From, edge.To)
+		}
+		g.markUsed(edge.From, edge.To)
+	}
+	g.eventNumber = 0
+	for _, event := range g.Events {
+		if event.Number > g.eventNumber {
+			g.eventNumber = event.Number
+		}
+	}
+	if !validNode(g.Ball) {
+		return fmt.Errorf("persisted ball position %v is outside the arena", g.Ball)
+	}
+	return nil
+}
+
+func (g *Game) RecordResumed() MatchEvent {
+	g.Status = Running
+	g.Deadline = time.Time{}
+	g.LastMessage = fmt.Sprintf("Match resumed from move %d", g.MoveNumber)
+	return g.recordEvent("match_resumed", "", g.LastMessage)
 }
 
 func (g *Game) markUsed(a, b Point) {

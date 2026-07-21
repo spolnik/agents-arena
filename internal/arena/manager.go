@@ -9,7 +9,11 @@ import (
 	"time"
 )
 
-var ErrPairAlreadyPlayed = errors.New("these agents have already played; each pairing is allowed only once")
+var (
+	ErrPairAlreadyPlayed  = errors.New("these agents have already played; each pairing is allowed only once")
+	ErrMatchAlreadyActive = errors.New("match is already active")
+	ErrMatchNotResumable  = errors.New("only interrupted waiting or running matches can be resumed")
+)
 
 type Agent struct {
 	ID          string    `json:"id"`
@@ -26,6 +30,7 @@ type Agent struct {
 
 type Repository interface {
 	GetAgent(id string) (Agent, error)
+	GetMatch(id string) (*Game, error)
 	CreateMatch(game *Game) error
 	SaveGame(game *Game, move *Move, event *MatchEvent) error
 }
@@ -64,7 +69,44 @@ func (m *Manager) Create(redID, blueID string) (*Game, error) {
 	m.mu.Lock()
 	m.games[id] = game
 	m.mu.Unlock()
-	go m.play(id, red, blue)
+	go m.play(id, red, blue, true)
+	return cloneGame(game), nil
+}
+
+func (m *Manager) Resume(id string) (*Game, error) {
+	game, err := m.repo.GetMatch(id)
+	if err != nil {
+		return nil, fmt.Errorf("load interrupted match: %w", err)
+	}
+	if game.Status != Running && game.Status != Waiting {
+		return nil, ErrMatchNotResumable
+	}
+	if err := game.RestoreRuntime(); err != nil {
+		return nil, fmt.Errorf("restore interrupted match: %w", err)
+	}
+	red, err := m.repo.GetAgent(game.RedAgent.ID)
+	if err != nil {
+		return nil, fmt.Errorf("red agent: %w", err)
+	}
+	blue, err := m.repo.GetAgent(game.BlueAgent.ID)
+	if err != nil {
+		return nil, fmt.Errorf("blue agent: %w", err)
+	}
+
+	m.mu.Lock()
+	if _, active := m.games[id]; active {
+		m.mu.Unlock()
+		return nil, ErrMatchAlreadyActive
+	}
+	m.games[id] = game
+	event := game.RecordResumed()
+	if err := m.repo.SaveGame(game, nil, &event); err != nil {
+		delete(m.games, id)
+		m.mu.Unlock()
+		return nil, fmt.Errorf("save resumed match: %w", err)
+	}
+	m.mu.Unlock()
+	go m.play(id, red, blue, false)
 	return cloneGame(game), nil
 }
 
@@ -78,13 +120,16 @@ func (m *Manager) Get(id string) (*Game, bool) {
 	return cloneGame(game), true
 }
 
-func (m *Manager) play(id string, red, blue Agent) {
-	m.mu.Lock()
-	game := m.games[id]
-	game.Status = Running
-	game.LastMessage = fmt.Sprintf("%s won the kickoff", game.Turn)
-	_ = m.repo.SaveGame(game, nil, nil)
-	m.mu.Unlock()
+func (m *Manager) play(id string, red, blue Agent, initialize bool) {
+	var game *Game
+	if initialize {
+		m.mu.Lock()
+		game = m.games[id]
+		game.Status = Running
+		game.LastMessage = fmt.Sprintf("%s won the kickoff", game.Turn)
+		_ = m.repo.SaveGame(game, nil, nil)
+		m.mu.Unlock()
+	}
 
 	agents := map[Color]Agent{Red: red, Blue: blue}
 	for {
@@ -96,14 +141,19 @@ func (m *Manager) play(id string, red, blue Agent) {
 			return
 		}
 		player := game.Turn
+		if !game.DecisionPending {
+			game.DecisionSeed = rand.Int64()
+			game.DecisionPending = true
+		}
 		state := DecisionState{
 			You: player, RedScore: game.RedScore, BlueScore: game.BlueScore,
 			Round: game.Round, MoveNumber: game.MoveNumber, Ball: game.Ball,
 			LegalMoves: append([]LegalMove(nil), game.LegalMoves()...),
-			Path:       append([]Edge(nil), game.Path...), DecisionSeed: rand.Int64(),
+			Path:       append([]Edge(nil), game.Path...), DecisionSeed: game.DecisionSeed,
 		}
 		game.Deadline = time.Now().Add(MoveTimeout)
 		game.LastMessage = fmt.Sprintf("%s is thinking", agents[player].Name)
+		_ = m.repo.SaveGame(game, nil, nil)
 		m.mu.Unlock()
 
 		direction, duration, err := RunScript(agents[player].Source, state, MoveTimeout)
@@ -111,6 +161,8 @@ func (m *Manager) play(id string, red, blue Agent) {
 		m.mu.Lock()
 		game = m.games[id]
 		game.Deadline = time.Time{}
+		game.DecisionSeed = 0
+		game.DecisionPending = false
 		if err != nil {
 			event := game.SkipTurn(player, fmt.Sprintf("%s turn skipped: %v", agents[player].Name, err))
 			_ = m.repo.SaveGame(game, nil, &event)

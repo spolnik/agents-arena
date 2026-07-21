@@ -5,6 +5,7 @@ import (
 	"errors"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/jacek/agents-arena/internal/arena"
 	_ "modernc.org/sqlite"
@@ -130,6 +131,30 @@ func TestMatchPairCanOnlyPlayOnceAndBuildsLeaderboard(t *testing.T) {
 	if err := db.SaveGame(game, nil, &event); err != nil {
 		t.Fatal(err)
 	}
+	game.DecisionSeed = 987654321
+	game.DecisionPending = true
+	if err := db.SaveGame(game, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	loadedRunning, err := db.GetMatch(game.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loadedRunning.Turn != game.Turn || loadedRunning.Ball != game.Ball || loadedRunning.DecisionSeed != game.DecisionSeed || !loadedRunning.DecisionPending {
+		t.Fatalf("durable running state = %#v", loadedRunning)
+	}
+	legal := loadedRunning.LegalMoves()
+	if len(legal) == 0 {
+		t.Fatal("restored running match has no legal moves")
+	}
+	if _, err := loadedRunning.Apply(legal[0].Direction, time.Millisecond); err != nil {
+		t.Fatalf("apply after restoration: %v", err)
+	}
+	if resumedEvent := loadedRunning.RecordResumed(); resumedEvent.Number != 2 {
+		t.Fatalf("restored event number = %d, want 2", resumedEvent.Number)
+	}
+	game.DecisionSeed = 0
+	game.DecisionPending = false
 	game.Status = arena.Finished
 	game.RedScore = 3
 	game.BlueScore = 1

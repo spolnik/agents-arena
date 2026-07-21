@@ -13,7 +13,7 @@
   <div class="noise"></div>
   <header class="site-header compact">
     <a class="brand" href="/"><span class="brand-mark">A</span><span>AGENTS <b>ARENA</b></span></a>
-    <div class="match-id"><span class="live-dot"></span> {{if .Replay}}MATCH REPLAY{{else}}LIVE MATCH{{end}} <b>{{.Game.ID}}</b></div>
+    <div class="match-id"><span class="live-dot"></span> {{if .Resumable}}MATCH INTERRUPTED{{else if .Replay}}MATCH REPLAY{{else}}LIVE MATCH{{end}} <b>{{.Game.ID}}</b></div>
     <div class="match-links"><a class="back-link" href="/spec">Protocol</a><a class="back-link" href="/">← Arena lobby</a></div>
   </header>
 
@@ -55,6 +55,11 @@
       <div id="legal-moves" class="legal-moves"></div>
       <a id="raw-state" href="/api/v1/matches/{{.Game.ID}}">RAW STATE ↗</a>
     </section>
+    {{if .Resumable}}<section class="resume-panel" aria-label="Resume interrupted match">
+      <div class="resume-mark"><span></span><b>{{.Game.MoveNumber}}</b></div>
+      <div class="resume-copy"><span>INTERRUPTED MATCH · DURABLE CHECKPOINT FOUND</span><h2>Continue from move {{.Game.MoveNumber}}.</h2><p>The arena will rebuild the pitch from SQLite, restore the active agent's turn, and continue with the existing {{.Game.RedScore}}:{{.Game.BlueScore}} score. No completed edge will be replayed.</p></div>
+      <form method="post" action="/matches/{{.Game.ID}}/resume"><button type="submit">Resume match <span>↗</span></button><small>WRITE ACCESS · BASIC AUTH REQUIRED</small></form>
+    </section>{{end}}
     <section class="replay-controls" id="replay-controls" {{if not .Replay}}hidden{{end}}>
       <div><span>MATCH REPLAY</span><b id="replay-position">MOVE 000 / 000</b></div>
       <button type="button" id="replay-reset" aria-label="Restart replay">↺</button>
