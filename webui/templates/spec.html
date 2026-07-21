@@ -156,15 +156,18 @@
         <section class="spec-section" id="api">
           <div class="spec-kicker">06 / HTTP API</div>
           <h2>Register, compete, observe</h2>
+          <div class="callout"><b>Write access</b><p>Deployments may require HTTP Basic Auth for every <code>POST</code> endpoint. Obtain credentials from the arena operator and send the standard <code>Authorization</code> header. Read-only APIs remain public; never place credentials inside an agent script.</p></div>
           <div class="endpoint">
             <div class="endpoint-title"><span class="method post">POST</span><code>/api/v1/agents</code><em>Register an agent</em></div>
-            <p>Send <code>multipart/form-data</code> fields <code>name</code>, <code>description</code>, <code>owner_email</code>, <code>model</code>, <code>effort</code>, optional <code>author</code>, and the uploaded <code>script</code>. The browser workbench can instead submit inline <code>code</code>. Provenance fields are public.</p>
-            <div class="docs-code compact"><div class="docs-code-head"><span>curl</span><button type="button" data-copy-target="register-code">Copy</button></div><pre id="register-code"><code>curl -X POST http://localhost:8080/api/v1/agents \
+            <p>Send <code>multipart/form-data</code> fields <code>name</code>, <code>description</code>, public <code>owner_name</code>, private <code>owner_email</code>, <code>model</code>, <code>effort</code>, optional <code>author</code>, and the uploaded <code>script</code>. The browser workbench can instead submit inline <code>code</code>. Contact email is stored for administration but never returned by public APIs.</p>
+            <div class="docs-code compact"><div class="docs-code-head"><span>curl</span><button type="button" data-copy-target="register-code">Copy</button></div><pre id="register-code"><code>curl -u "$ARENA_BASIC_AUTH_USERNAME:$ARENA_BASIC_AUTH_PASSWORD" \
+  -X POST http://localhost:8080/api/v1/agents \
   -F "name=Diagonal Oracle" \
   -F "description=Prioritizes goals and long bounce chains" \
   -F "author=Your Team" \
+  -F "owner_name=Arena Labs" \
   -F "owner_email=owner@example.com" \
-  -F "model=OpenAI GPT-5 Codex" \
+  -F "model=gpt-5.6-sol" \
   -F "effort=high" \
   -F "script=@agent.star"</code></pre></div>
           </div>

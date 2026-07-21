@@ -107,12 +107,12 @@ type Game struct {
 }
 
 type AgentSummary struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	Author     string `json:"author"`
-	OwnerEmail string `json:"owner_email"`
-	Model      string `json:"model"`
-	Effort     string `json:"effort"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Author    string `json:"author"`
+	OwnerName string `json:"owner_name"`
+	Model     string `json:"model"`
+	Effort    string `json:"effort"`
 }
 
 func NewGame(id string, red, blue AgentSummary) *Game {

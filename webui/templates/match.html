@@ -19,9 +19,9 @@
 
   <main class="match-shell">
     <section class="scoreboard" aria-label="Score">
-      <div class="competitor red-team"><span class="color-chip red"></span><div class="match-agent-identity" data-model="{{.Game.RedAgent.Model}}"><small>RED / NORTH</small><h1 id="red-name">{{.Game.RedAgent.Name}}</h1><p>{{.Game.RedAgent.Author}} · <a href="mailto:{{.Game.RedAgent.OwnerEmail}}">{{.Game.RedAgent.OwnerEmail}}</a></p><span>{{.Game.RedAgent.Model}} · {{.Game.RedAgent.Effort}} effort</span></div><strong id="red-score">{{.Game.RedScore}}</strong></div>
+      <div class="competitor red-team"><span class="color-chip red"></span><div class="match-agent-identity" data-model="{{.Game.RedAgent.Model}}"><small>RED / NORTH</small><h1 id="red-name">{{.Game.RedAgent.Name}}</h1><p>{{.Game.RedAgent.OwnerName}}{{if ne .Game.RedAgent.Author .Game.RedAgent.OwnerName}} · {{.Game.RedAgent.Author}}{{end}}</p><span>{{.Game.RedAgent.Model}} · {{.Game.RedAgent.Effort}} effort</span></div><strong id="red-score">{{.Game.RedScore}}</strong></div>
       <div class="round-state"><small>ROUND <b id="round">{{.Game.Round}}</b></small><div><span id="status">{{.Game.Status}}</span></div><p>FIRST TO 3</p></div>
-      <div class="competitor blue-team"><strong id="blue-score">{{.Game.BlueScore}}</strong><div class="match-agent-identity" data-model="{{.Game.BlueAgent.Model}}"><small>BLUE / SOUTH</small><h1 id="blue-name">{{.Game.BlueAgent.Name}}</h1><p>{{.Game.BlueAgent.Author}} · <a href="mailto:{{.Game.BlueAgent.OwnerEmail}}">{{.Game.BlueAgent.OwnerEmail}}</a></p><span>{{.Game.BlueAgent.Model}} · {{.Game.BlueAgent.Effort}} effort</span></div><span class="color-chip blue"></span></div>
+      <div class="competitor blue-team"><strong id="blue-score">{{.Game.BlueScore}}</strong><div class="match-agent-identity" data-model="{{.Game.BlueAgent.Model}}"><small>BLUE / SOUTH</small><h1 id="blue-name">{{.Game.BlueAgent.Name}}</h1><p>{{.Game.BlueAgent.OwnerName}}{{if ne .Game.BlueAgent.Author .Game.BlueAgent.OwnerName}} · {{.Game.BlueAgent.Author}}{{end}}</p><span>{{.Game.BlueAgent.Model}} · {{.Game.BlueAgent.Effort}} effort</span></div><span class="color-chip blue"></span></div>
     </section>
 
     <div class="match-grid">

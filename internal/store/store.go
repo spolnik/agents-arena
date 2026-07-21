@@ -43,7 +43,8 @@ CREATE TABLE IF NOT EXISTS agents (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
     author TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
+	description TEXT NOT NULL DEFAULT '',
+	owner_name TEXT NOT NULL DEFAULT '',
 	owner_email TEXT NOT NULL DEFAULT '',
 	model TEXT NOT NULL DEFAULT '',
 	effort TEXT NOT NULL DEFAULT '',
@@ -99,6 +100,7 @@ CREATE INDEX IF NOT EXISTS matches_created_idx ON matches(created_at DESC);
 	}
 	for _, statement := range []string{
 		`ALTER TABLE agents ADD COLUMN description TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE agents ADD COLUMN owner_name TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE agents ADD COLUMN owner_email TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE agents ADD COLUMN model TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE agents ADD COLUMN effort TEXT NOT NULL DEFAULT ''`,
@@ -107,6 +109,12 @@ CREATE INDEX IF NOT EXISTS matches_created_idx ON matches(created_at DESC);
 		if _, err := s.db.Exec(statement); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
 			return err
 		}
+	}
+	if _, err := s.db.Exec(`
+UPDATE agents SET owner_name='Arena Labs' WHERE owner_name='';
+UPDATE agents SET model='gpt-5.6-sol' WHERE model IN ('OpenAI GPT-5 Codex', 'GPT-5 Codex');
+`); err != nil {
+		return err
 	}
 	if _, err := s.db.Exec(`
 UPDATE matches
@@ -130,13 +138,13 @@ ON matches(pair_key) WHERE pair_key <> '';
 	return nil
 }
 
-func (s *Store) CreateAgent(name, author, description, ownerEmail, model, effort, source string) (arena.Agent, error) {
+func (s *Store) CreateAgent(name, author, description, ownerName, ownerEmail, model, effort, source string) (arena.Agent, error) {
 	agent := arena.Agent{
 		ID: id("agent"), Name: name, Author: author, Description: description,
-		OwnerEmail: ownerEmail, Model: model, Effort: effort, Source: source, CreatedAt: time.Now().UTC(),
+		OwnerName: ownerName, OwnerEmail: ownerEmail, Model: model, Effort: effort, Source: source, CreatedAt: time.Now().UTC(),
 	}
-	_, err := s.db.Exec(`INSERT INTO agents(id,name,author,description,owner_email,model,effort,source,created_at) VALUES(?,?,?,?,?,?,?,?,?)`,
-		agent.ID, agent.Name, agent.Author, agent.Description, agent.OwnerEmail, agent.Model, agent.Effort, agent.Source, agent.CreatedAt.Format(time.RFC3339Nano))
+	_, err := s.db.Exec(`INSERT INTO agents(id,name,author,description,owner_name,owner_email,model,effort,source,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)`,
+		agent.ID, agent.Name, agent.Author, agent.Description, agent.OwnerName, agent.OwnerEmail, agent.Model, agent.Effort, agent.Source, agent.CreatedAt.Format(time.RFC3339Nano))
 	if err != nil {
 		return arena.Agent{}, err
 	}
@@ -146,8 +154,8 @@ func (s *Store) CreateAgent(name, author, description, ownerEmail, model, effort
 func (s *Store) GetAgent(id string) (arena.Agent, error) {
 	var agent arena.Agent
 	var created string
-	err := s.db.QueryRow(`SELECT id,name,author,description,owner_email,model,effort,source,created_at FROM agents WHERE id=?`, id).
-		Scan(&agent.ID, &agent.Name, &agent.Author, &agent.Description, &agent.OwnerEmail, &agent.Model, &agent.Effort, &agent.Source, &created)
+	err := s.db.QueryRow(`SELECT id,name,author,description,owner_name,owner_email,model,effort,source,created_at FROM agents WHERE id=?`, id).
+		Scan(&agent.ID, &agent.Name, &agent.Author, &agent.Description, &agent.OwnerName, &agent.OwnerEmail, &agent.Model, &agent.Effort, &agent.Source, &created)
 	if err != nil {
 		return arena.Agent{}, err
 	}
@@ -156,7 +164,7 @@ func (s *Store) GetAgent(id string) (arena.Agent, error) {
 }
 
 func (s *Store) ListAgents() ([]arena.Agent, error) {
-	rows, err := s.db.Query(`SELECT id,name,author,description,owner_email,model,effort,created_at FROM agents ORDER BY created_at DESC`)
+	rows, err := s.db.Query(`SELECT id,name,author,description,owner_name,owner_email,model,effort,created_at FROM agents ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +173,7 @@ func (s *Store) ListAgents() ([]arena.Agent, error) {
 	for rows.Next() {
 		var agent arena.Agent
 		var created string
-		if err := rows.Scan(&agent.ID, &agent.Name, &agent.Author, &agent.Description, &agent.OwnerEmail, &agent.Model, &agent.Effort, &created); err != nil {
+		if err := rows.Scan(&agent.ID, &agent.Name, &agent.Author, &agent.Description, &agent.OwnerName, &agent.OwnerEmail, &agent.Model, &agent.Effort, &created); err != nil {
 			return nil, err
 		}
 		agent.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
@@ -175,22 +183,22 @@ func (s *Store) ListAgents() ([]arena.Agent, error) {
 }
 
 type MatchRow struct {
-	ID             string
-	RedName        string
-	RedAuthor      string
-	RedOwnerEmail  string
-	RedModel       string
-	RedEffort      string
-	BlueName       string
-	BlueAuthor     string
-	BlueOwnerEmail string
-	BlueModel      string
-	BlueEffort     string
-	Status         string
-	RedScore       int
-	BlueScore      int
-	Winner         string
-	CreatedAt      time.Time
+	ID            string
+	RedName       string
+	RedAuthor     string
+	RedOwnerName  string
+	RedModel      string
+	RedEffort     string
+	BlueName      string
+	BlueAuthor    string
+	BlueOwnerName string
+	BlueModel     string
+	BlueEffort    string
+	Status        string
+	RedScore      int
+	BlueScore     int
+	Winner        string
+	CreatedAt     time.Time
 }
 
 type LeaderboardRow struct {
@@ -198,7 +206,7 @@ type LeaderboardRow struct {
 	AgentID      string `json:"agent_id"`
 	Name         string `json:"name"`
 	Author       string `json:"author"`
-	OwnerEmail   string `json:"owner_email"`
+	OwnerName    string `json:"owner_name"`
 	Model        string `json:"model"`
 	Effort       string `json:"effort"`
 	Played       int    `json:"played"`
@@ -220,8 +228,8 @@ type PlayedPair struct {
 func (s *Store) ListMatches(limit int) ([]MatchRow, error) {
 	rows, err := s.db.Query(`
 SELECT m.id,
-       r.name,r.author,r.owner_email,r.model,r.effort,
-       b.name,b.author,b.owner_email,b.model,b.effort,
+       r.name,r.author,r.owner_name,r.model,r.effort,
+       b.name,b.author,b.owner_name,b.model,b.effort,
        m.status,m.red_score,m.blue_score,m.winner,m.created_at
 FROM matches m JOIN agents r ON r.id=m.red_agent_id JOIN agents b ON b.id=m.blue_agent_id
 ORDER BY m.created_at DESC LIMIT ?`, limit)
@@ -235,8 +243,8 @@ ORDER BY m.created_at DESC LIMIT ?`, limit)
 		var created string
 		if err := rows.Scan(
 			&row.ID,
-			&row.RedName, &row.RedAuthor, &row.RedOwnerEmail, &row.RedModel, &row.RedEffort,
-			&row.BlueName, &row.BlueAuthor, &row.BlueOwnerEmail, &row.BlueModel, &row.BlueEffort,
+			&row.RedName, &row.RedAuthor, &row.RedOwnerName, &row.RedModel, &row.RedEffort,
+			&row.BlueName, &row.BlueAuthor, &row.BlueOwnerName, &row.BlueModel, &row.BlueEffort,
 			&row.Status, &row.RedScore, &row.BlueScore, &row.Winner, &created,
 		); err != nil {
 			return nil, err
@@ -258,12 +266,12 @@ WITH results AS (
            CASE WHEN winner='blue' THEN 1 ELSE 0 END
     FROM matches WHERE status='finished'
 )
-SELECT a.id, a.name, a.author, a.owner_email, a.model, a.effort,
+SELECT a.id, a.name, a.author, a.owner_name, a.model, a.effort,
        COUNT(r.agent_id), COALESCE(SUM(r.won), 0),
        COALESCE(SUM(r.goals_for), 0), COALESCE(SUM(r.goals_against), 0)
 FROM agents a
 LEFT JOIN results r ON r.agent_id=a.id
-GROUP BY a.id, a.name, a.author, a.owner_email, a.model, a.effort
+GROUP BY a.id, a.name, a.author, a.owner_name, a.model, a.effort
 ORDER BY COALESCE(SUM(r.won), 0) DESC,
          COALESCE(SUM(r.goals_for-r.goals_against), 0) DESC,
          COALESCE(SUM(r.goals_for), 0) DESC,
@@ -276,7 +284,7 @@ ORDER BY COALESCE(SUM(r.won), 0) DESC,
 	for rows.Next() {
 		var row LeaderboardRow
 		if err := rows.Scan(
-			&row.AgentID, &row.Name, &row.Author, &row.OwnerEmail, &row.Model, &row.Effort,
+			&row.AgentID, &row.Name, &row.Author, &row.OwnerName, &row.Model, &row.Effort,
 			&row.Played, &row.Wins, &row.GoalsFor, &row.GoalsAgainst,
 		); err != nil {
 			return nil, err
@@ -322,8 +330,8 @@ func (s *Store) GetMatch(id string) (*arena.Game, error) {
 	var status, winner, created string
 	err := s.db.QueryRow(`
 SELECT m.id,
-       r.id,r.name,r.author,r.owner_email,r.model,r.effort,
-       b.id,b.name,b.author,b.owner_email,b.model,b.effort,
+       r.id,r.name,r.author,r.owner_name,r.model,r.effort,
+       b.id,b.name,b.author,b.owner_name,b.model,b.effort,
        m.status,m.red_score,m.blue_score,
        m.winner, m.round, m.message, m.created_at
 FROM matches m
@@ -331,8 +339,8 @@ JOIN agents r ON r.id=m.red_agent_id
 JOIN agents b ON b.id=m.blue_agent_id
 WHERE m.id=?`, id).Scan(
 		&game.ID,
-		&game.RedAgent.ID, &game.RedAgent.Name, &game.RedAgent.Author, &game.RedAgent.OwnerEmail, &game.RedAgent.Model, &game.RedAgent.Effort,
-		&game.BlueAgent.ID, &game.BlueAgent.Name, &game.BlueAgent.Author, &game.BlueAgent.OwnerEmail, &game.BlueAgent.Model, &game.BlueAgent.Effort,
+		&game.RedAgent.ID, &game.RedAgent.Name, &game.RedAgent.Author, &game.RedAgent.OwnerName, &game.RedAgent.Model, &game.RedAgent.Effort,
+		&game.BlueAgent.ID, &game.BlueAgent.Name, &game.BlueAgent.Author, &game.BlueAgent.OwnerName, &game.BlueAgent.Model, &game.BlueAgent.Effort,
 		&status, &game.RedScore, &game.BlueScore, &winner, &game.Round, &game.LastMessage, &created,
 	)
 	if err != nil {
@@ -451,11 +459,11 @@ func (s *Store) SaveGame(game *arena.Game, move *arena.Move, event *arena.MatchE
 }
 
 func (s *Store) SeedExamples() error {
-	for _, seed := range []struct{ name, author, description, ownerEmail, model, effort, source string }{
-		{"North Star", "Arena Labs", "Pushes relentlessly toward the opposing goal and takes every direct scoring chance.", "jacek@engineering.ai", "OpenAI GPT-5 Codex", "high", northStarScript},
-		{"Bounce Hunter", "Arena Labs", "Prefers connected vertices to extend turns, then uses a seeded tie-break between equal moves.", "jacek@engineering.ai", "OpenAI GPT-5 Codex", "high", bounceHunterScript},
-		{"Full Press", "Arena Labs", "A full-forward strategy that maximizes goalward progress, stays central, takes scoring edges immediately, and extends attacks through bounces.", "jacek@engineering.ai", "OpenAI GPT-5 Codex", "high", fullPressScript},
-		{"Iron Curtain", "Arena Labs", "A blocking strategy that clears its defensive half, consumes connected vertices, pressures the sidelines, and uses bounces to close lanes.", "jacek@engineering.ai", "OpenAI GPT-5 Codex", "high", ironCurtainScript},
+	for _, seed := range []struct{ name, author, description, ownerName, ownerEmail, model, effort, source string }{
+		{"North Star", "Arena Labs", "Pushes relentlessly toward the opposing goal and takes every direct scoring chance.", "Arena Labs", "jacek@engineering.ai", "gpt-5.6-sol", "high", northStarScript},
+		{"Bounce Hunter", "Arena Labs", "Prefers connected vertices to extend turns, then uses a seeded tie-break between equal moves.", "Arena Labs", "jacek@engineering.ai", "gpt-5.6-sol", "high", bounceHunterScript},
+		{"Full Press", "Arena Labs", "A full-forward strategy that maximizes goalward progress, stays central, takes scoring edges immediately, and extends attacks through bounces.", "Arena Labs", "jacek@engineering.ai", "gpt-5.6-sol", "high", fullPressScript},
+		{"Iron Curtain", "Arena Labs", "A blocking strategy that clears its defensive half, consumes connected vertices, pressures the sidelines, and uses bounces to close lanes.", "Arena Labs", "jacek@engineering.ai", "gpt-5.6-sol", "high", ironCurtainScript},
 	} {
 		if err := arena.ValidateScript(seed.source); err != nil {
 			return fmt.Errorf("validate seeded agent %s: %w", seed.name, err)
@@ -467,15 +475,16 @@ func (s *Store) SeedExamples() error {
 		if existing > 0 {
 			if _, err := s.db.Exec(`UPDATE agents SET
 description=CASE WHEN description='' THEN ? ELSE description END,
+owner_name=CASE WHEN owner_name='' THEN ? ELSE owner_name END,
 owner_email=CASE WHEN owner_email='' THEN ? ELSE owner_email END,
 model=CASE WHEN model='' THEN ? ELSE model END,
 effort=CASE WHEN effort='' THEN ? ELSE effort END
-WHERE name=?`, seed.description, seed.ownerEmail, seed.model, seed.effort, seed.name); err != nil {
+WHERE name=?`, seed.description, seed.ownerName, seed.ownerEmail, seed.model, seed.effort, seed.name); err != nil {
 				return err
 			}
 			continue
 		}
-		if _, err := s.CreateAgent(seed.name, seed.author, seed.description, seed.ownerEmail, seed.model, seed.effort, seed.source); err != nil {
+		if _, err := s.CreateAgent(seed.name, seed.author, seed.description, seed.ownerName, seed.ownerEmail, seed.model, seed.effort, seed.source); err != nil {
 			return err
 		}
 	}

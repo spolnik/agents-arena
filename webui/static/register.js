@@ -150,7 +150,7 @@
   });
   validateButton.addEventListener("click", validateCode);
 
-  [["input[name='name']", "name-count"], ["input[name='author']", "author-count"], ["#agent-description", "description-count"], ["input[name='model']", "model-count"]].forEach(([selector, outputID]) => {
+  [["input[name='name']", "name-count"], ["input[name='author']", "author-count"], ["#agent-description", "description-count"], ["input[name='owner_name']", "owner-name-count"], ["input[name='model']", "model-count"]].forEach(([selector, outputID]) => {
     const input = document.querySelector(selector);
     const output = document.getElementById(outputID);
     input?.addEventListener("input", () => { output.textContent = input.value.length; });

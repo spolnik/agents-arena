@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -17,8 +18,8 @@ import (
 )
 
 func main() {
-	addr := flag.String("addr", ":8080", "HTTP listen address")
-	database := flag.String("db", "arena.db", "SQLite database path")
+	addr := flag.String("addr", defaultAddress(), "HTTP listen address")
+	database := flag.String("db", defaultDatabasePath(), "SQLite database path")
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
@@ -35,7 +36,10 @@ func main() {
 	}
 
 	manager := arena.NewManager(db, logger)
-	handler, err := webui.New(db, manager, logger)
+	handler, err := webui.NewWithBasicAuth(db, manager, logger, webui.BasicAuthConfig{
+		Username: os.Getenv("ARENA_BASIC_AUTH_USERNAME"),
+		Password: os.Getenv("ARENA_BASIC_AUTH_PASSWORD"),
+	})
 	if err != nil {
 		logger.Error("create web server", "error", err)
 		os.Exit(1)
@@ -62,4 +66,21 @@ func main() {
 		logger.Error("serve", "error", err)
 		os.Exit(1)
 	}
+}
+
+func defaultAddress() string {
+	if port := os.Getenv("PORT"); port != "" {
+		return ":" + port
+	}
+	return ":8080"
+}
+
+func defaultDatabasePath() string {
+	if path := os.Getenv("ARENA_DATABASE_PATH"); path != "" {
+		return path
+	}
+	if mount := os.Getenv("RAILWAY_VOLUME_MOUNT_PATH"); mount != "" {
+		return filepath.Join(mount, "arena.db")
+	}
+	return "arena.db"
 }

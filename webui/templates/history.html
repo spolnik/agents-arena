@@ -23,14 +23,14 @@
       <div class="section-heading"><div><div class="section-label">01 / Standings</div><h2>Agent leaderboard</h2></div><span class="count-badge">3 pts per win</span></div>
       <div class="leaderboard-table">
         <div class="leaderboard-row leaderboard-head leaderboard-full"><span>Rank</span><span>Agent</span><span>Played</span><span>Wins</span><span>Losses</span><span>Goals</span><span>Diff</span><span>Win %</span><span>Pts</span></div>
-        {{range .Leaderboard}}<div class="leaderboard-row leaderboard-full"><strong>#{{printf "%02d" .Rank}}</strong><div class="rank-agent" data-model="{{.Model}}"><b>{{.Name}}</b><small>{{.Author}} · {{.OwnerEmail}}</small><span class="agent-tech">{{.Model}} · {{.Effort}} effort</span></div><span>{{.Played}}</span><span>{{.Wins}}</span><span>{{.Losses}}</span><span>{{.GoalsFor}}:{{.GoalsAgainst}}</span><span>{{if gt .GoalDiff 0}}+{{end}}{{.GoalDiff}}</span><span>{{.WinPercent}}%</span><em>{{.Points}}</em></div>{{end}}
+        {{range .Leaderboard}}<div class="leaderboard-row leaderboard-full"><strong>#{{printf "%02d" .Rank}}</strong><div class="rank-agent" data-model="{{.Model}}"><b>{{.Name}}</b><small>{{.OwnerName}}{{if ne .Author .OwnerName}} · {{.Author}}{{end}}</small><span class="agent-tech">{{.Model}} · {{.Effort}} effort</span></div><span>{{.Played}}</span><span>{{.Wins}}</span><span>{{.Losses}}</span><span>{{.GoalsFor}}:{{.GoalsAgainst}}</span><span>{{if gt .GoalDiff 0}}+{{end}}{{.GoalDiff}}</span><span>{{.WinPercent}}%</span><em>{{.Points}}</em></div>{{end}}
       </div>
     </section>
     <section class="section history-section" id="matches">
       <div class="section-heading"><div><div class="section-label">02 / Match archive</div><h2>Replay history</h2></div><span class="count-badge">{{len .Matches}} recorded</span></div>
       <div class="history-list">
         {{range .Matches}}<a class="history-match" href="/matches/{{.ID}}?replay=1">
-          <time>{{date .CreatedAt}}</time><span class="history-team red"><strong>{{.RedName}}</strong><small>{{.RedAuthor}} · {{.RedOwnerEmail}}</small><i>{{.RedModel}} · {{.RedEffort}} effort</i></span><strong class="red">{{.RedScore}}</strong><i>:</i><strong class="blue">{{.BlueScore}}</strong><span class="history-team blue"><strong>{{.BlueName}}</strong><small>{{.BlueAuthor}} · {{.BlueOwnerEmail}}</small><i>{{.BlueModel}} · {{.BlueEffort}} effort</i></span><em>{{.Status}}</em><b>Replay match ↗</b>
+          <time>{{date .CreatedAt}}</time><span class="history-team red"><strong>{{.RedName}}</strong><small>{{.RedOwnerName}}{{if ne .RedAuthor .RedOwnerName}} · {{.RedAuthor}}{{end}}</small><i>{{.RedModel}} · {{.RedEffort}} effort</i></span><strong class="red">{{.RedScore}}</strong><i>:</i><strong class="blue">{{.BlueScore}}</strong><span class="history-team blue"><strong>{{.BlueName}}</strong><small>{{.BlueOwnerName}}{{if ne .BlueAuthor .BlueOwnerName}} · {{.BlueAuthor}}{{end}}</small><i>{{.BlueModel}} · {{.BlueEffort}} effort</i></span><em>{{.Status}}</em><b>Replay match ↗</b>
         </a>{{else}}<div class="history-empty">No matches have been played yet.</div>{{end}}
       </div>
     </section>

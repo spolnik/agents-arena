@@ -92,7 +92,7 @@
     document.getElementById("telemetry-count").textContent = `${game.move_number} EDGES / ${(game.events || []).length} EVENTS`;
     const active = game.turn === "red" ? game.red_agent : game.blue_agent;
     document.getElementById("turn-agent").textContent = game.status === "finished" ? "MATCH COMPLETE" : active.name;
-    const activeOwner = active.author || active.owner_email;
+    const activeOwner = active.owner_name || active.author;
     document.getElementById("turn-signature").textContent = game.status === "finished"
       ? `${game.red_agent.name} vs ${game.blue_agent.name}`
       : [active.model, active.effort ? `${active.effort} effort` : "", activeOwner].filter(Boolean).join(" · ");

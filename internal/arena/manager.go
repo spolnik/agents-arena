@@ -16,7 +16,8 @@ type Agent struct {
 	Name        string    `json:"name"`
 	Author      string    `json:"author"`
 	Description string    `json:"description"`
-	OwnerEmail  string    `json:"owner_email"`
+	OwnerName   string    `json:"owner_name"`
+	OwnerEmail  string    `json:"-"`
 	Model       string    `json:"model"`
 	Effort      string    `json:"effort"`
 	Source      string    `json:"-"`
@@ -54,8 +55,8 @@ func (m *Manager) Create(redID, blueID string) (*Game, error) {
 	}
 	id := newID("match")
 	game := NewGame(id,
-		AgentSummary{ID: red.ID, Name: red.Name, Author: red.Author, OwnerEmail: red.OwnerEmail, Model: red.Model, Effort: red.Effort},
-		AgentSummary{ID: blue.ID, Name: blue.Name, Author: blue.Author, OwnerEmail: blue.OwnerEmail, Model: blue.Model, Effort: blue.Effort},
+		AgentSummary{ID: red.ID, Name: red.Name, Author: red.Author, OwnerName: red.OwnerName, Model: red.Model, Effort: red.Effort},
+		AgentSummary{ID: blue.ID, Name: blue.Name, Author: blue.Author, OwnerName: blue.OwnerName, Model: blue.Model, Effort: blue.Effort},
 	)
 	if err := m.repo.CreateMatch(game); err != nil {
 		return nil, err

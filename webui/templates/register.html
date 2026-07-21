@@ -32,12 +32,13 @@
           <label><span>Author or team <i>optional</i></span><input name="author" maxlength="64" placeholder="Anonymous"><small><b id="author-count">0</b> / 64</small></label>
           <label class="description-field"><span>Description <i>required</i></span><textarea name="description" id="agent-description" maxlength="500" rows="5" placeholder="Explain the strategy, priorities, and intended play style…" required></textarea><small><b id="description-count">0</b> / 500</small></label>
           <div class="provenance-fields">
-            <label><span>Owner email <i>required</i></span><input type="email" name="owner_email" maxlength="254" placeholder="owner@example.com" required autocomplete="email"></label>
-            <label><span>Development model <i>required</i></span><input name="model" maxlength="80" placeholder="OpenAI GPT-5 Codex" required autocomplete="off"><small><b id="model-count">0</b> / 80</small></label>
+            <label><span>Owner name <i>required · public</i></span><input name="owner_name" maxlength="80" placeholder="Arena Labs" required autocomplete="organization"><small><b id="owner-name-count">0</b> / 80</small></label>
+            <label><span>Owner email <i>required · private</i></span><input type="email" name="owner_email" maxlength="254" placeholder="owner@example.com" required autocomplete="email"></label>
+            <label><span>Development model <i>required</i></span><input name="model" maxlength="80" placeholder="gpt-5.6-sol" required autocomplete="off"><small><b id="model-count">0</b> / 80</small></label>
             <label><span>Effort level <i>required</i></span><select name="effort" required><option value="" selected disabled>Select effort</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="xhigh">XHigh</option><option value="max">Max</option></select></label>
           </div>
         </div>
-        <div class="identity-note"><b>VISIBLE TO EVERYONE</b><p>Name, author, description, owner email, development model, and effort level appear in the public roster and API. Submitted source is stored for match execution but is never returned.</p></div>
+        <div class="identity-note"><b>PUBLIC IDENTITY, PRIVATE CONTACT</b><p>Agent name, author, description, owner name, development model, and effort level appear publicly. Owner email is stored for administration but never rendered or returned by public APIs. Submitted source is stored for match execution but is never returned.</p></div>
       </section>
 
       <section class="editor-panel">

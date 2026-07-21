@@ -1,6 +1,8 @@
 package webui
 
 import (
+	"crypto/sha256"
+	"crypto/subtle"
 	"embed"
 	"encoding/json"
 	"errors"
@@ -29,6 +31,11 @@ type Server struct {
 	handler   http.Handler
 }
 
+type BasicAuthConfig struct {
+	Username string
+	Password string
+}
+
 type pageData struct {
 	Title       string
 	Agents      []arena.Agent
@@ -44,6 +51,13 @@ type pageData struct {
 }
 
 func New(db *store.Store, manager *arena.Manager, logger *slog.Logger) (http.Handler, error) {
+	return NewWithBasicAuth(db, manager, logger, BasicAuthConfig{})
+}
+
+func NewWithBasicAuth(db *store.Store, manager *arena.Manager, logger *slog.Logger, auth BasicAuthConfig) (http.Handler, error) {
+	if err := auth.validate(); err != nil {
+		return nil, err
+	}
 	templates, err := template.New("pages").Funcs(template.FuncMap{
 		"lower":  strings.ToLower,
 		"addOne": func(value int) int { return value + 1 },
@@ -64,26 +78,63 @@ func New(db *store.Store, manager *arena.Manager, logger *slog.Logger) (http.Han
 	if err != nil {
 		return nil, err
 	}
+	protected := func(handler http.HandlerFunc) http.Handler {
+		return requireBasicAuth(handler, auth)
+	}
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 	mux.HandleFunc("GET /", s.home)
 	mux.HandleFunc("GET /spec", s.specPage)
-	mux.HandleFunc("GET /register", s.registerPage)
+	mux.Handle("GET /register", protected(s.registerPage))
 	mux.HandleFunc("GET /history", s.historyPage)
-	mux.HandleFunc("POST /agents", s.registerAgent)
-	mux.HandleFunc("POST /matches", s.createMatch)
+	mux.Handle("POST /agents", protected(s.registerAgent))
+	mux.Handle("POST /matches", protected(s.createMatch))
 	mux.HandleFunc("GET /matches/{id}", s.matchPage)
 	mux.HandleFunc("GET /api/v1/agents", s.listAgentsAPI)
 	mux.HandleFunc("GET /api/v1/leaderboard", s.leaderboardAPI)
 	mux.HandleFunc("GET /api/v1/matchups", s.matchupsAPI)
-	mux.HandleFunc("POST /api/v1/agents", s.registerAgentAPI)
-	mux.HandleFunc("POST /api/v1/agents/validate", s.validateAgentAPI)
-	mux.HandleFunc("POST /api/v1/registrations/{color}", s.registerColorAPI)
-	mux.HandleFunc("POST /api/v1/matches", s.createMatchAPI)
+	mux.Handle("POST /api/v1/agents", protected(s.registerAgentAPI))
+	mux.Handle("POST /api/v1/agents/validate", protected(s.validateAgentAPI))
+	mux.Handle("POST /api/v1/registrations/{color}", protected(s.registerColorAPI))
+	mux.Handle("POST /api/v1/matches", protected(s.createMatchAPI))
 	mux.HandleFunc("GET /api/v1/matches/{id}", s.matchAPI)
 	mux.HandleFunc("GET /api/v1/matches/{id}/available-moves", s.availableMovesAPI)
 	mux.HandleFunc("GET /api/v1/spec", s.specAPI)
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, "ok\n")
+	})
 	s.handler = requestLogger(logger, securityHeaders(mux))
 	return s.handler, nil
+}
+
+func (config BasicAuthConfig) validate() error {
+	if (config.Username == "") != (config.Password == "") {
+		return errors.New("ARENA_BASIC_AUTH_USERNAME and ARENA_BASIC_AUTH_PASSWORD must be configured together")
+	}
+	return nil
+}
+
+func requireBasicAuth(next http.Handler, config BasicAuthConfig) http.Handler {
+	if config.Username == "" && config.Password == "" {
+		return next
+	}
+	expectedUsername := sha256.Sum256([]byte(config.Username))
+	expectedPassword := sha256.Sum256([]byte(config.Password))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		username, password, ok := r.BasicAuth()
+		usernameHash := sha256.Sum256([]byte(username))
+		passwordHash := sha256.Sum256([]byte(password))
+		validUsername := subtle.ConstantTimeCompare(usernameHash[:], expectedUsername[:]) == 1
+		validPassword := subtle.ConstantTimeCompare(passwordHash[:], expectedPassword[:]) == 1
+		if !ok || !validUsername || !validPassword {
+			w.Header().Set("WWW-Authenticate", `Basic realm="Agents Arena", charset="UTF-8"`)
+			w.Header().Set("Cache-Control", "no-store")
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) home(w http.ResponseWriter, r *http.Request) {
@@ -182,6 +233,7 @@ func (s *Server) agentFromRequest(w http.ResponseWriter, r *http.Request) (arena
 	name := strings.TrimSpace(r.FormValue("name"))
 	author := strings.TrimSpace(r.FormValue("author"))
 	description := strings.TrimSpace(r.FormValue("description"))
+	ownerName := strings.TrimSpace(r.FormValue("owner_name"))
 	ownerEmail := strings.ToLower(strings.TrimSpace(r.FormValue("owner_email")))
 	model := strings.TrimSpace(r.FormValue("model"))
 	effort := strings.TrimSpace(r.FormValue("effort"))
@@ -196,6 +248,9 @@ func (s *Server) agentFromRequest(w http.ResponseWriter, r *http.Request) (arena
 	}
 	if description == "" || len(description) > 500 {
 		return arena.Agent{}, errors.New("description is required and must be at most 500 characters")
+	}
+	if ownerName == "" || len(ownerName) > 80 {
+		return arena.Agent{}, errors.New("owner name is required and must be at most 80 characters")
 	}
 	parsedEmail, err := mail.ParseAddress(ownerEmail)
 	if ownerEmail == "" || len(ownerEmail) > 254 || err != nil || parsedEmail.Address != ownerEmail {
@@ -230,7 +285,7 @@ func (s *Server) agentFromRequest(w http.ResponseWriter, r *http.Request) (arena
 	if err := arena.ValidateScript(source); err != nil {
 		return arena.Agent{}, fmt.Errorf("script validation failed: %w", err)
 	}
-	agent, err := s.store.CreateAgent(name, author, description, ownerEmail, model, effort, source)
+	agent, err := s.store.CreateAgent(name, author, description, ownerName, ownerEmail, model, effort, source)
 	if err != nil {
 		if store.IsConflict(err) {
 			return arena.Agent{}, errors.New("an agent with that name already exists")
@@ -380,7 +435,8 @@ func (s *Server) specAPI(w http.ResponseWriter, _ *http.Request) {
 		"directions":           map[string]int{"N": 0, "NE": 1, "E": 2, "SE": 3, "S": 4, "SW": 5, "W": 6, "NW": 7},
 		"timeout_ms":           5000,
 		"maximum_script_bytes": arena.MaxScriptBytes,
-		"registration_fields":  []string{"name", "description", "owner_email", "model", "effort", "author", "script|code"},
+		"write_auth":           "HTTP Basic Auth on POST endpoints when configured; read endpoints remain public",
+		"registration_fields":  []string{"name", "description", "owner_name", "owner_email", "model", "effort", "author", "script|code"},
 		"pairing_rule":         "each unordered pair of agents may play exactly once",
 		"competition_endpoints": []string{
 			"GET /api/v1/leaderboard", "GET /api/v1/matchups", "GET /api/v1/matches/{match_id}",

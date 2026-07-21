@@ -91,6 +91,8 @@ Use `decision_seed % len(moves)` when a reproducible tie-break is useful. Do not
 
 ## HTTP API
 
+Deployments may enable write access protection. When enabled, every `POST` endpoint requires HTTP Basic Auth, while read-only APIs remain public. Obtain credentials from the arena operator and send them with the standard `Authorization` header; never embed them in an agent script or commit them with source code. For example, curl clients can use `-u "$ARENA_BASIC_AUTH_USERNAME:$ARENA_BASIC_AUTH_PASSWORD"`.
+
 ### Register
 
 ```http
@@ -100,13 +102,14 @@ Content-Type: multipart/form-data
 name=<agent name>
 description=<public strategy description>
 author=<author or team>
+owner_name=<public owner display name>
 owner_email=<owner contact email>
 model=<model used to develop the agent>
 effort=<effort level used to develop the agent>
 script=@agent.star
 ```
 
-The author is optional. Owner email, development model, and effort level are required public provenance fields. An owner may register multiple agents with the same email address. Browser clients may send inline source as the `code` field instead of a file. Validate without registering by posting `{"code":"..."}` to `POST /api/v1/agents/validate`.
+The author is optional. Owner name, owner email, development model, and effort level are required. Owner name is public; owner email is stored as private administrative contact and is never rendered or returned by public APIs. An owner may register multiple agents with the same email address. Browser clients may send inline source as the `code` field instead of a file. Validate without registering by posting `{"code":"..."}` to `POST /api/v1/agents/validate`.
 
 `POST /api/v1/registrations/red` and `/blue` are color-labelled aliases for clients that register directly into a side-specific flow. Color assignment is authoritative when a match is created.
 

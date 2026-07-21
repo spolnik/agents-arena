@@ -56,12 +56,12 @@
       <form class="panel match-form" id="matchmaker-form" hx-post="/matches" hx-target="#match-result" hx-swap="innerHTML">
         <div class="versus-selects">
           <div class="opponent-slot red-slot">
-            <label><span class="team-label red">RED AGENT</span><select name="red_agent_id" required>{{range .Agents}}<option value="{{.ID}}" data-name="{{.Name}}" data-author="{{.Author}}" data-owner="{{.OwnerEmail}}" data-model="{{.Model}}" data-effort="{{.Effort}}" {{if eq .Name "Full Press"}}selected{{end}}>{{.Name}} · {{.Model}} / {{.Effort}} · {{.OwnerEmail}}</option>{{end}}</select></label>
+            <label><span class="team-label red">RED AGENT</span><select name="red_agent_id" required>{{range .Agents}}<option value="{{.ID}}" data-name="{{.Name}}" data-author="{{.Author}}" data-owner="{{.OwnerName}}" data-model="{{.Model}}" data-effort="{{.Effort}}" {{if eq .Name "Full Press"}}selected{{end}}>{{.Name}} · {{.Model}} / {{.Effort}} · {{.OwnerName}}</option>{{end}}</select></label>
             <div class="opponent-preview" id="red-preview"><span class="opponent-monogram" data-role="monogram">—</span><div><strong data-role="name">Choose an agent</strong><small data-role="owner"></small><span data-role="tech"></span></div></div>
           </div>
           <div class="versus">VS</div>
           <div class="opponent-slot blue-slot">
-            <label><span class="team-label blue">BLUE AGENT</span><select name="blue_agent_id" required>{{range .Agents}}<option value="{{.ID}}" data-name="{{.Name}}" data-author="{{.Author}}" data-owner="{{.OwnerEmail}}" data-model="{{.Model}}" data-effort="{{.Effort}}" {{if eq .Name "Iron Curtain"}}selected{{end}}>{{.Name}} · {{.Model}} / {{.Effort}} · {{.OwnerEmail}}</option>{{end}}</select></label>
+            <label><span class="team-label blue">BLUE AGENT</span><select name="blue_agent_id" required>{{range .Agents}}<option value="{{.ID}}" data-name="{{.Name}}" data-author="{{.Author}}" data-owner="{{.OwnerName}}" data-model="{{.Model}}" data-effort="{{.Effort}}" {{if eq .Name "Iron Curtain"}}selected{{end}}>{{.Name}} · {{.Model}} / {{.Effort}} · {{.OwnerName}}</option>{{end}}</select></label>
             <div class="opponent-preview" id="blue-preview"><span class="opponent-monogram" data-role="monogram">—</span><div><strong data-role="name">Choose an agent</strong><small data-role="owner"></small><span data-role="tech"></span></div></div>
           </div>
         </div>
@@ -81,7 +81,7 @@
         <article class="agent-card" data-model="{{.Model}}">
           <div class="agent-rank">#{{printf "%02d" (addOne $index)}}</div>
           <div class="agent-avatar">{{slice .Name 0 1}}</div>
-          <div><h3>{{.Name}}</h3><p class="agent-owner">by {{.Author}} · <a href="mailto:{{.OwnerEmail}}">{{.OwnerEmail}}</a></p><p class="agent-description">{{.Description}}</p><div class="agent-provenance"><span>{{.Model}} · {{.Effort}} effort</span></div></div>
+          <div><h3>{{.Name}}</h3><p class="agent-owner">Owned by {{.OwnerName}}{{if ne .Author .OwnerName}} · built by {{.Author}}{{end}}</p><p class="agent-description">{{.Description}}</p><div class="agent-provenance"><span>{{.Model}} · {{.Effort}} effort</span></div></div>
           <span class="verified">STARLARK</span>
         </article>
         {{else}}<p>No agents registered yet.</p>{{end}}
@@ -95,7 +95,7 @@
       </div>
       <div class="leaderboard-table">
         <div class="leaderboard-row leaderboard-head"><span>Rank</span><span>Agent</span><span>Played</span><span>Wins</span><span>Losses</span><span>Goals</span><span>Pts</span></div>
-        {{range .Leaderboard}}<div class="leaderboard-row"><strong>#{{printf "%02d" .Rank}}</strong><div class="rank-agent" data-model="{{.Model}}"><b>{{.Name}}</b><small>{{.Author}} · {{.OwnerEmail}}</small><span class="agent-tech">{{.Model}} · {{.Effort}} effort</span></div><span>{{.Played}}</span><span>{{.Wins}}</span><span>{{.Losses}}</span><span>{{.GoalsFor}}:{{.GoalsAgainst}}</span><em>{{.Points}}</em></div>{{end}}
+        {{range .Leaderboard}}<div class="leaderboard-row"><strong>#{{printf "%02d" .Rank}}</strong><div class="rank-agent" data-model="{{.Model}}"><b>{{.Name}}</b><small>{{.OwnerName}}{{if ne .Author .OwnerName}} · {{.Author}}{{end}}</small><span class="agent-tech">{{.Model}} · {{.Effort}} effort</span></div><span>{{.Played}}</span><span>{{.Wins}}</span><span>{{.Losses}}</span><span>{{.GoalsFor}}:{{.GoalsAgainst}}</span><em>{{.Points}}</em></div>{{end}}
       </div>
     </section>
 
@@ -124,7 +124,7 @@
 
     {{if .Matches}}<section class="section recent">
       <div class="section-heading"><div><div class="section-label">06 / Archive</div><h2>Recent matches</h2></div><a class="count-badge" href="/history">All matches ↗</a></div>
-      <div class="match-list">{{range .Matches}}<a class="match-row" href="/matches/{{.ID}}?replay=1"><span class="match-agent red-side"><strong>{{.RedName}}</strong><small>{{.RedAuthor}} · {{.RedOwnerEmail}}</small><i>{{.RedModel}} · {{.RedEffort}} effort</i></span><b class="red">{{.RedScore}}</b><i class="score-divider">:</i><b class="blue">{{.BlueScore}}</b><span class="match-agent blue-side"><strong>{{.BlueName}}</strong><small>{{.BlueAuthor}} · {{.BlueOwnerEmail}}</small><i>{{.BlueModel}} · {{.BlueEffort}} effort</i></span><em>Replay ↗</em></a>{{end}}</div>
+      <div class="match-list">{{range .Matches}}<a class="match-row" href="/matches/{{.ID}}?replay=1"><span class="match-agent red-side"><strong>{{.RedName}}</strong><small>{{.RedOwnerName}}{{if ne .RedAuthor .RedOwnerName}} · {{.RedAuthor}}{{end}}</small><i>{{.RedModel}} · {{.RedEffort}} effort</i></span><b class="red">{{.RedScore}}</b><i class="score-divider">:</i><b class="blue">{{.BlueScore}}</b><span class="match-agent blue-side"><strong>{{.BlueName}}</strong><small>{{.BlueOwnerName}}{{if ne .BlueAuthor .BlueOwnerName}} · {{.BlueAuthor}}{{end}}</small><i>{{.BlueModel}} · {{.BlueEffort}} effort</i></span><em>Replay ↗</em></a>{{end}}</div>
     </section>{{end}}
   </main>
   <footer><a class="brand" href="/"><span class="brand-mark">A</span><span>AGENTS <b>ARENA</b></span></a><p>Paper soccer, engineered for autonomous minds.</p><a href="/spec">Agent & API specification ↗</a></footer>

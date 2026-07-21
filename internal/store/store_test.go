@@ -20,9 +20,19 @@ func TestOpenMigratesAgentMetadata(t *testing.T) {
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL UNIQUE,
         author TEXT NOT NULL,
+		description TEXT NOT NULL DEFAULT '',
+		owner_email TEXT NOT NULL DEFAULT '',
+		model TEXT NOT NULL DEFAULT '',
+		effort TEXT NOT NULL DEFAULT '',
         source TEXT NOT NULL,
         created_at TEXT NOT NULL
-    )`)
+    );
+	INSERT INTO agents(id,name,author,description,owner_email,model,effort,source,created_at)
+	VALUES(
+		'agent_legacy', 'Legacy Agent', 'Legacy Team', 'Created before public owner names.',
+		'legacy@example.com', 'OpenAI GPT-5 Codex', 'high',
+		'def choose_move(state): return 0', '2026-01-01T00:00:00Z'
+	);`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,9 +45,19 @@ func TestOpenMigratesAgentMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
+	legacyAgent, err := db.GetAgent("agent_legacy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if legacyAgent.OwnerName != "Arena Labs" || legacyAgent.Model != "gpt-5.6-sol" {
+		t.Fatalf("legacy provenance = owner %q, model %q", legacyAgent.OwnerName, legacyAgent.Model)
+	}
+	if legacyAgent.OwnerEmail != "legacy@example.com" {
+		t.Fatalf("legacy owner email was not preserved: %q", legacyAgent.OwnerEmail)
+	}
 	agent, err := db.CreateAgent(
 		"Migrated", "Test", "A persisted description.",
-		"owner@example.com", "OpenAI GPT-5 Codex", "high",
+		"Arena Labs", "owner@example.com", "gpt-5.6-sol", "high",
 		"def choose_move(state): return 0",
 	)
 	if err != nil {
@@ -50,8 +70,8 @@ func TestOpenMigratesAgentMetadata(t *testing.T) {
 	if loaded.Description != "A persisted description." {
 		t.Fatalf("description = %q", loaded.Description)
 	}
-	if loaded.OwnerEmail != "owner@example.com" || loaded.Model != "OpenAI GPT-5 Codex" || loaded.Effort != "high" {
-		t.Fatalf("provenance = email %q, model %q, effort %q", loaded.OwnerEmail, loaded.Model, loaded.Effort)
+	if loaded.OwnerName != "Arena Labs" || loaded.OwnerEmail != "owner@example.com" || loaded.Model != "gpt-5.6-sol" || loaded.Effort != "high" {
+		t.Fatalf("provenance = owner %q, email %q, model %q, effort %q", loaded.OwnerName, loaded.OwnerEmail, loaded.Model, loaded.Effort)
 	}
 }
 
@@ -72,8 +92,8 @@ func TestSeedExamplesIncludeProvenance(t *testing.T) {
 		t.Fatalf("seeded agents = %d", len(agents))
 	}
 	for _, agent := range agents {
-		if agent.OwnerEmail != "jacek@engineering.ai" || agent.Model != "OpenAI GPT-5 Codex" || agent.Effort != "high" {
-			t.Fatalf("%s provenance = email %q, model %q, effort %q", agent.Name, agent.OwnerEmail, agent.Model, agent.Effort)
+		if agent.OwnerName != "Arena Labs" || agent.OwnerEmail != "jacek@engineering.ai" || agent.Model != "gpt-5.6-sol" || agent.Effort != "high" {
+			t.Fatalf("%s provenance = owner %q, email %q, model %q, effort %q", agent.Name, agent.OwnerName, agent.OwnerEmail, agent.Model, agent.Effort)
 		}
 	}
 }
@@ -85,11 +105,11 @@ func TestMatchPairCanOnlyPlayOnceAndBuildsLeaderboard(t *testing.T) {
 	}
 	defer db.Close()
 	source := "def choose_move(state): return state[\"legal_moves\"][0][\"direction\"]"
-	red, err := db.CreateAgent("Red Test", "Tests", "Red test agent.", "red@example.com", "Test Model", "high", source)
+	red, err := db.CreateAgent("Red Test", "Tests", "Red test agent.", "Red Owner", "red@example.com", "test-model", "high", source)
 	if err != nil {
 		t.Fatal(err)
 	}
-	blue, err := db.CreateAgent("Blue Test", "Tests", "Blue test agent.", "blue@example.com", "Test Model", "high", source)
+	blue, err := db.CreateAgent("Blue Test", "Tests", "Blue test agent.", "Blue Owner", "blue@example.com", "test-model", "high", source)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,10 +153,10 @@ func TestMatchPairCanOnlyPlayOnceAndBuildsLeaderboard(t *testing.T) {
 	if len(loaded.Events) != 1 || loaded.Events[0].Type != "turn_skipped" || loaded.Events[0].Message == "" {
 		t.Fatalf("loaded events = %#v", loaded.Events)
 	}
-	if loaded.RedAgent.OwnerEmail != "red@example.com" || loaded.RedAgent.Model != "Test Model" || loaded.RedAgent.Effort != "high" || loaded.RedAgent.Author != "Tests" {
+	if loaded.RedAgent.OwnerName != "Red Owner" || loaded.RedAgent.Model != "test-model" || loaded.RedAgent.Effort != "high" || loaded.RedAgent.Author != "Tests" {
 		t.Fatalf("loaded red provenance = %#v", loaded.RedAgent)
 	}
-	if loaded.BlueAgent.OwnerEmail != "blue@example.com" || loaded.BlueAgent.Model != "Test Model" || loaded.BlueAgent.Effort != "high" || loaded.BlueAgent.Author != "Tests" {
+	if loaded.BlueAgent.OwnerName != "Blue Owner" || loaded.BlueAgent.Model != "test-model" || loaded.BlueAgent.Effort != "high" || loaded.BlueAgent.Author != "Tests" {
 		t.Fatalf("loaded blue provenance = %#v", loaded.BlueAgent)
 	}
 	leaders, err := db.Leaderboard()
@@ -146,7 +166,7 @@ func TestMatchPairCanOnlyPlayOnceAndBuildsLeaderboard(t *testing.T) {
 	if len(leaders) != 2 || leaders[0].Name != red.Name || leaders[0].Wins != 1 || leaders[0].Points != 3 || leaders[0].GoalDiff != 2 {
 		t.Fatalf("leaderboard = %#v", leaders)
 	}
-	if leaders[0].OwnerEmail != "red@example.com" || leaders[0].Model != "Test Model" || leaders[0].Effort != "high" || leaders[0].Author != "Tests" {
+	if leaders[0].OwnerName != "Red Owner" || leaders[0].Model != "test-model" || leaders[0].Effort != "high" || leaders[0].Author != "Tests" {
 		t.Fatalf("leaderboard provenance = %#v", leaders[0])
 	}
 	pairs, err := db.ListPlayedPairs()

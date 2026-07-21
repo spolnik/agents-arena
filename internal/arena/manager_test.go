@@ -33,8 +33,8 @@ func TestManagerDecisionFailureSkipsTurnWithoutGoal(t *testing.T) {
 	invalid := `def choose_move(state): return 99`
 	repo := &faultRepository{
 		agents: map[string]Agent{
-			"red":  {ID: "red", Name: "Broken Red", Author: "Red Team", OwnerEmail: "red@example.com", Model: "Model Red", Effort: "high", Source: invalid},
-			"blue": {ID: "blue", Name: "Broken Blue", Author: "Blue Team", OwnerEmail: "blue@example.com", Model: "Model Blue", Effort: "medium", Source: invalid},
+			"red":  {ID: "red", Name: "Broken Red", Author: "Red Team", OwnerName: "Red Owner", OwnerEmail: "red@example.com", Model: "model-red", Effort: "high", Source: invalid},
+			"blue": {ID: "blue", Name: "Broken Blue", Author: "Blue Team", OwnerName: "Blue Owner", OwnerEmail: "blue@example.com", Model: "model-blue", Effort: "medium", Source: invalid},
 		},
 		faults: make(chan capturedFault, 1),
 	}
@@ -44,10 +44,10 @@ func TestManagerDecisionFailureSkipsTurnWithoutGoal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if game.RedAgent.OwnerEmail != "red@example.com" || game.RedAgent.Model != "Model Red" || game.RedAgent.Effort != "high" || game.RedAgent.Author != "Red Team" {
+	if game.RedAgent.OwnerName != "Red Owner" || game.RedAgent.Model != "model-red" || game.RedAgent.Effort != "high" || game.RedAgent.Author != "Red Team" {
 		t.Fatalf("red agent summary = %#v", game.RedAgent)
 	}
-	if game.BlueAgent.OwnerEmail != "blue@example.com" || game.BlueAgent.Model != "Model Blue" || game.BlueAgent.Effort != "medium" || game.BlueAgent.Author != "Blue Team" {
+	if game.BlueAgent.OwnerName != "Blue Owner" || game.BlueAgent.Model != "model-blue" || game.BlueAgent.Effort != "medium" || game.BlueAgent.Author != "Blue Team" {
 		t.Fatalf("blue agent summary = %#v", game.BlueAgent)
 	}
 	select {
